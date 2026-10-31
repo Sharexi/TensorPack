@@ -21,7 +21,7 @@
 
 \title{\textbf{MicroTensor Computing (MTC-8):\\An Architecture for Adaptive Sub-Byte GEMM, Spatial Octrees, and Prime Residue Arithmetic}}
 
-\author{\textbf{Sharexi}\thanks{Correspondence: \texttt{https://github.com/Sharexi/TensorPack}}}
+\author{\textbf{Aniello Quaranta}\thanks{GitHub: \texttt{https://github.com/Sharexi/TensorPack}}}
 \date{\today}
 
 \begin{document}
@@ -98,7 +98,7 @@ Joint Precision Negotiation searches the precision pair $(p_A, p_B) \in \{2, 4, 
 
 Extending micro-tensors to 3D spatial volumes reveals that the elementary storage model natively captures spatial voxel geometry.
 
-\subsection{The Elementary $2\times 2\times 2$ Micro-Cube}
+\subsection{The Elementary \texorpdfstring{$2\times 2\times 2$}{2x2x2} Micro-Cube}
 An elementary 3D volume element contains $2^3 = 8$ scalar voxels:
 \begin{itemize}
     \item \textbf{P1 (1-bit Spin / Binary)}: 8 voxel values ($\{-1, +1\}$ or $\{0, 1\}$) pack into \textbf{exactly one 8-bit byte} ($8 \times 1\text{ bit} = 8\text{ bits}$).
@@ -130,7 +130,7 @@ Reconstruction is performed via precomputed CRT orthogonal weights $w_i = M_i (M
 X = \left( \sum_{i=1}^k s_i \cdot w_i \right) \bmod M
 \end{equation}
 
-\subsection{Balanced Ternary ($\mathbb{F}_3$) and Radix Economy}
+\subsection{Balanced Ternary (\texorpdfstring{$\mathbb{F}_3$}{F3}) and Radix Economy}
 The hardware cost to represent integers up to $N$ with radix $b$ is quantified by the radix economy:
 \begin{equation}
 E(b, N) = b \cdot \lceil \log_b N \rceil
@@ -146,7 +146,7 @@ Yielding a \textbf{20\% storage density gain} over standard 2-bit packing. In li
 Y = X W = \sum_{k: W_{kj}=1} X_{ik} - \sum_{k: W_{kj}=-1} X_{ik}
 \end{equation}
 
-\subsection{$p$-Adic Ultrametric Tree Topologies}
+\subsection{\texorpdfstring{$p$}{p}-Adic Ultrametric Tree Topologies}
 Hierarchical quadtrees and octrees possess an ultrametric metric space topology governed by the strong triangle inequality:
 \begin{equation}
 d_p(x, z) \le \max\big(d_p(x, y), \; d_p(y, z)\big)
@@ -161,7 +161,7 @@ This allows hierarchical semantic structures to be embedded into micro-tensor tr
 
 We evaluated MTC-8 across dense matrix multiplication benchmarks, 3D spatial volumes, and end-to-end neural network training and inference. All experiments were conducted on an Intel x86-64 CPU using parallel Numba compilation.
 
-\subsection{Dense Matrix Multiplication ($N=256$)}
+\subsection{Dense Matrix Multiplication (\texorpdfstring{$N=256$}{N=256})}
 
 We compared MTC-8 against FP32 NumPy BLAS, compiled INT8 GEMM, and packed INT4 GEMM across four matrix distributions:
 
@@ -209,7 +209,7 @@ We constructed a 4-layer DeepMLP ($256 \to 512 \to 512 \to 256 \to 16$) with 528
 \begin{table}[ht]
 \centering
 \small
-\caption{End-to-End Neural Network Inference & Storage (Batch Size 16)}
+\caption{End-to-End Neural Network Inference \& Storage (Batch Size 16)}
 \label{tab:nn}
 \begin{tabular}{lcccc}
 \toprule
@@ -227,6 +227,31 @@ Conventional INT8 & 521.1 KB & 4.0$\times$ & 1.265 & 12,648 \\
 
 \textbf{Multiplier-Free Training}: In 15 epochs of classification training using Quantization-Aware Training with the Straight-Through Estimator (STE) \cite{bengio2013ste}, Balanced Ternary converged steadily from loss $2.7716 \to 2.7537$. Model parameter memory was reduced by \textbf{19.1$\times$} (108 KB vs 2,069 KB), with \textbf{zero hardware multiplications} in both layer forward and backward activation passes.
 
+\section{Related Work and Prior Art Delineation}
+
+To clearly position MTC-8 within the literature, we delineate its contributions against established paradigms across four distinct subfields:
+
+\subsection{Block-Floating-Point and Microscaling (MX) Formats}
+Block-Floating-Point (BFP) representations date back to early numerical analysis \cite{koster2017flexpoint}. Recently, the Open Compute Project standardized Microscaling Formats (MXFP8, MXFP6, MXFP4, MXINT8) \cite{rouhani2023microscaling, ocp2023mx}, defining shared 8-bit scale factors (E8M0) across fixed 1D vector blocks of 32 elements. 
+While MTC-8 shares the concept of block-level scaling, it differs fundamentally in three respects:
+\begin{enumerate}
+    \item \textbf{Localized 2D/3D Tiling vs. 1D Vectors}: MTC-8 structures computation around $2\times 2$ micro-tiles and $2\times 2\times 2$ micro-cubes, matching spatial and tensor contraction symmetries rather than arbitrary 1D vector chunks.
+    \item \textbf{Joint Precision Negotiation}: OCP MX formats assign bit-widths statically or independently per tensor. MTC-8 introduces joint negotiation between interacting operands $A_{ik}$ and $B_{kj}$, optimizing the forward bilinear product error $\Delta(AB) \le \epsilon$.
+    \item \textbf{Decoupled Structural Pointers}: MX formats target flat memory buffers. MTC-8 coordinates micro-tensors through an out-of-band pointer hierarchy (`PointerTensor`), enabling zero-copy transposition, quadtree composition, and lazy computational DAGs.
+\end{enumerate}
+
+\subsection{Outlier-Aware and Low-Bit Quantization}
+Modern post-training quantization techniques for large language models isolate high-magnitude outlier activations to prevent numerical collapse. LLM.int8() \cite{dettmers2022llm} extracts outlier feature vectors into FP16 matrix multiplications while computing the remainder in INT8. SmoothQuant \cite{xiao2023smoothquant} applies per-channel scale transformations to invert dynamic range from activations to weights. AWQ \cite{lin2023awq} protects salient weight channels, SpQR \cite{dettmers2023spqr} isolates individual outliers into sparse Compressed Sparse Row (CSR) matrices, and QuIP\# \cite{tseng2024quip} employs randomized Hadamard transforms to suppress incoherence before vector quantization.
+In contrast, MTC-8 handles outliers at the \emph{tile granularity} via its native P16 escape mode within a unified contiguous arena. This avoids the irregular memory accesses and index-chasing overhead of sparse CSR representations while preserving full dynamic range for high-energy blocks.
+
+\subsection{Spatial Voxel Hierarchies and Neural Radiance Fields}
+Sparse Voxel Octrees (SVOs) \cite{laine2010efficient} and neural octrees such as PlenOctrees \cite{yu2021plenoctrees} and Instant-NGP \cite{muller2022instant} leverage multiresolution grids to accelerate volumetric ray marching and radiance caching in computer graphics.
+MTC-8 generalizes this concept to arbitrary 3D tensor algebra: it couples $2\times 2\times 2$ micro-cubes with sub-byte numerical representations (where a 1-bit spin cube fits exactly in 1 byte) and integrates vacuum octant pruning directly into arithmetic operations, enabling 3D convolutions at 13,500 MVOX/s and 47.6$\times$ memory reduction on sparse fields.
+
+\subsection{Residue Number Systems and Non-Binary Computing}
+Residue Number Systems (RNS) have been investigated for digital signal processing and modular MAC accelerators in deep neural networks \cite{omondi2007residue, bajard2020rns, knuth1997art}. Prior RNS accelerators treat residue channels purely as low-level circuit replacements for binary adders. MTC-8 bridges RNS with high-level tensor hierarchies, demonstrating carry-free modular matrix multiplication in closed finite fields $\mathbb{F}_p$.
+Furthermore, following historical ternary computing \cite{brusentsov1958setun} and modern 1-bit architectures like BitNet b1.58 \cite{wang2024bitnet}, MTC-8 grounds balanced ternary $\mathbb{F}_3$ in Euler's radix economy ($e \approx 2.718$) \cite{hayes2001third}, introduces a base-3 5-trits-per-byte packing encoder (+20\% density over 2-bit packing), and demonstrates multiplier-free Quantization-Aware Training convergence. Finally, MTC-8 establishes a rigorous isometric mapping between hierarchical tree traversal and non-Archimedean $p$-adic ultrametric distance \cite{khrennikov1997non, murtagh2014thinking}.
+
 \section{Hardware Implementation Roadmap}
 
 While CPU prototypes validate arithmetic representations, the ultimate throughput advantage of MTC-8 requires dedicated hardware execution:
@@ -239,6 +264,15 @@ While CPU prototypes validate arithmetic representations, the ultimate throughpu
 \section{Conclusion}
 
 MicroTensor Computing (MTC-8) replaces monolithic, uniform fixed-precision arrays with discrete geometric volume elements, joint error-bounded precision negotiation, spatial octree vacuum pruning, and number-theoretic prime residue arithmetic. Empirical results confirm that MTC-8 eliminates precision collapse on non-uniform distributions (reducing error from 43.3\% to 0.70\%), accelerates CPU inference by 5.1$\times$, compresses 3D spatial fields by 47.6$\times$, and enables 19.1$\times$ parameter compression during training with zero hardware multipliers. MTC-8 provides a concrete foundation for next-generation geometric AI accelerators and low-power edge hardware.
+
+\section*{Author Contributions and AI Assistance Disclosure}
+
+\textbf{Author Contributions}: \textbf{Aniello Quaranta} formulated the original vision, conceptual architecture, and theoretical foundations of MicroTensor Computing, conceived the joint precision negotiation mechanics, spatial octree volume partitioning, and prime-residue ring mappings, directed the empirical benchmarks, and performed the final manuscript synthesis and verification.
+
+\textbf{AI Assistance Disclosure}: In accordance with arXiv, IEEE, and ACM guidelines regarding generative artificial intelligence in academic research, the author discloses that Google DeepMind's Gemini / Antigravity was utilized as an interactive AI pair programmer and drafting assistant. Under the author's direct instruction, architectural oversight, and rigorous verification, the AI assisted in translating algorithmic specifications into high-performance Python/Numba kernels, executing benchmark suites, compiling comparative metrics, formatting empirical tables, and assisting in the initial literature compilation and draft structuring. All conceptual formulations, final manuscript revisions, and scientific claims remain the sole responsibility of the author.
+
+\section*{Code and Reproducibility}
+The complete implementation, automated test suites (34 unit and integration tests), and single-command benchmark reproduction harness are publicly available under the MIT License at \url{https://github.com/Sharexi/TensorPack}.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}

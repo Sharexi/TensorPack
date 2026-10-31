@@ -1,6 +1,6 @@
 # MicroTensor Computing (MTC-8): An Architecture for Adaptive Sub-Byte GEMM, Spatial Octrees, and Prime Residue Arithmetic
 
-**Author:** Sharexi  
+**Author:** Aniello Quaranta ([Sharexi](https://github.com/Sharexi))  
 **Code & Reproduction:** [https://github.com/Sharexi/TensorPack](https://github.com/Sharexi/TensorPack)  
 **Preprint:** arXiv Submission Draft (cs.AR / cs.LG / cs.DC)
 
@@ -166,7 +166,38 @@ $$d(A, B) = p^{-h(A, B)}$$
 
 ---
 
-## 7. Hardware Implementation Roadmap
+## 7. Related Work and Prior Art Delineation
+
+To rigorously position MTC-8 within the literature, we delineate its contributions against established paradigms across four subfields:
+
+### A. Block-Floating-Point and Microscaling (MX) Formats
+Block-Floating-Point (BFP) representations date back to early numerical computing (Wilkinson, 1963; Köster et al., 2017). Recently, the Open Compute Project standardized Microscaling Formats (MXFP8, MXFP6, MXFP4, MXINT8; Rouhani et al., 2023; OCP, 2023), defining shared 8-bit scale factors (E8M0) across fixed 1D vector blocks of 32 elements. 
+While MTC-8 shares the concept of block-level scaling, it differs fundamentally in three respects:
+1. **Localized 2D/3D Tiling vs. 1D Vectors**: MTC-8 structures computation around $2\times 2$ micro-tiles and $2\times 2\times 2$ micro-cubes, matching spatial and tensor contraction symmetries rather than arbitrary 1D vector chunks.
+2. **Joint Precision Negotiation**: OCP MX formats assign bit-widths statically or independently per tensor. MTC-8 introduces joint negotiation between interacting operands $A_{ik}$ and $B_{kj}$, optimizing the forward bilinear product error $\Delta(AB) \le \epsilon$.
+3. **Decoupled Structural Pointers**: MX formats target flat memory buffers. MTC-8 coordinates micro-tensors through an out-of-band pointer hierarchy (`PointerTensor`), enabling zero-copy transposition, quadtree composition, and lazy computational DAGs.
+
+### B. Outlier-Aware and Low-Bit Quantization
+Modern post-training quantization techniques for large language models isolate high-magnitude outlier activations to prevent numerical collapse:
+- **LLM.int8()** (Dettmers et al., 2022) extracts outlier feature vectors into FP16 matrix multiplications while computing the remainder in INT8.
+- **SmoothQuant** (Xiao et al., 2023) applies per-channel scale transformations to invert dynamic range from activations to weights.
+- **AWQ** (Lin et al., 2024) protects salient weight channels.
+- **SpQR** (Dettmers et al., 2024) isolates individual outliers into sparse Compressed Sparse Row (CSR) matrices.
+- **QuIP#** (Tseng et al., 2024) employs randomized Hadamard transforms to suppress incoherence before vector quantization.
+
+In contrast, MTC-8 handles outliers at the **tile granularity** via its native P16 escape mode within a unified contiguous arena. This avoids the irregular memory accesses and index-chasing overhead of sparse CSR representations while preserving full dynamic range for high-energy blocks.
+
+### C. Spatial Voxel Hierarchies and Neural Radiance Fields
+Sparse Voxel Octrees (SVOs; Laine & Karras, 2010) and neural octrees such as PlenOctrees (Yu et al., 2021) and Instant-NGP (Müller et al., 2022) leverage multiresolution grids to accelerate volumetric ray marching and radiance caching in computer graphics.
+MTC-8 generalizes this concept to arbitrary 3D tensor algebra: it couples $2\times 2\times 2$ micro-cubes with sub-byte numerical representations (where a 1-bit spin cube fits exactly in 1 byte) and integrates vacuum octant pruning directly into arithmetic operations, enabling 3D convolutions at 13,500 MVOX/s and 47.6x memory reduction on sparse fields.
+
+### D. Residue Number Systems and Non-Binary Computing
+Residue Number Systems (RNS) have been investigated for digital signal processing and modular MAC accelerators in deep neural networks (Omondi & Premkumar, 2007; Bajard et al., 2020; Knuth, 1997). Prior RNS accelerators treat residue channels purely as low-level circuit replacements for binary adders. MTC-8 bridges RNS with high-level tensor hierarchies, demonstrating carry-free modular matrix multiplication in closed finite fields $\mathbb{F}_p$.
+Furthermore, following historical ternary computing (Brusentsov et al., 1958) and modern 1-bit architectures like BitNet b1.58 (Wang et al., 2024), MTC-8 grounds balanced ternary $\mathbb{F}_3$ in Euler's radix economy ($e \approx 2.718$; Hayes, 2001), introduces a base-3 5-trits-per-byte packing encoder (+20% density over 2-bit packing), and demonstrates multiplier-free Quantization-Aware Training convergence. Finally, MTC-8 establishes a rigorous isometric mapping between hierarchical tree traversal and non-Archimedean $p$-adic ultrametric distance (Khrennikov, 1997; Murtagh, 2014).
+
+---
+
+## 8. Hardware Implementation Roadmap
 
 1. **Sub-Byte ALU Array**: A custom $\operatorname{MTMUL}$ functional unit executing four 2-bit multiply-accumulates in a single clock cycle without software bit-shifting.
 2. **Asynchronous Octree Traverser**: Dedicated hardware traversal units that skip vacuum octants in one cycle, streaming only active micro-cubes to execution pipelines.
@@ -174,9 +205,16 @@ $$d(A, B) = p^{-h(A, B)}$$
 
 ---
 
-## 8. Conclusion
+## 9. Conclusion
 
 MicroTensor Computing (MTC-8) replaces monolithic, uniform fixed-precision arrays with discrete geometric volume elements, joint error-bounded precision negotiation, spatial octree vacuum pruning, and number-theoretic prime residue arithmetic. Empirical results confirm that MTC-8 eliminates precision collapse on non-uniform distributions (reducing error from 43.3% to 0.70%), accelerates CPU inference by 5.1x, compresses 3D spatial fields by 47.6x, and enables 19.1x parameter compression during training with zero hardware multipliers.
+
+---
+
+## Author Contributions and AI Assistance Disclosure
+
+- **Author Contributions**: **Aniello Quaranta** formulated the original research concept, theoretical foundations, and mathematical framework of MicroTensor Computing, conceived the joint precision negotiation mechanics, spatial octree volume partitioning, and prime-residue ring mappings, directed all empirical benchmarks, and performed the final manuscript synthesis and verification.
+- **AI Assistance Disclosure**: In accordance with arXiv, IEEE, and ACM guidelines regarding generative artificial intelligence in academic research, the author discloses that Google DeepMind's Gemini / Antigravity was utilized as an interactive AI pair programmer and drafting assistant. Under the author's direct instruction, architectural oversight, and rigorous verification, the AI assisted in translating algorithmic specifications into high-performance Python/Numba kernels, executing automated benchmark suites, compiling comparative metrics, formatting empirical tables, and assisting in the initial literature compilation and draft structuring. All conceptual formulations, final manuscript revisions, and scientific claims remain the sole responsibility of the author.
 
 ---
 
@@ -186,9 +224,20 @@ MicroTensor Computing (MTC-8) replaces monolithic, uniform fixed-precision array
 2. Dettmers, T., et al. (2022). *LLM.int8(): 8-bit Matrix Multiplication for Transformers at Scale*. NeurIPS.
 3. Xiao, G., et al. (2023). *SmoothQuant: Accurate and Efficient Post-Training Quantization for Large Language Models*. ICML.
 4. Lin, J., et al. (2024). *AWQ: Activation-aware Weight Quantization for On-Device LLM Compression and Acceleration*. MLSys.
-5. Bengio, Y., et al. (2013). *Estimating or propagating gradients through stochastic neurons for conditional computation*. arXiv:1308.3432.
-6. Bronstein, M. M., et al. (2021). *Geometric Deep Learning: Grids, Groups, Graphs, Geodesics, and Gauges*. arXiv:2104.13478.
-7. Knuth, D. E. (1997). *The Art of Computer Programming, Volume 2: Seminumerical Algorithms*. Addison-Wesley.
-8. Hayes, B. (2001). *Third base: Ternary computing and radix economy*. American Scientist.
-9. Khrennikov, A. (1997). *Non-Archimedean Analysis: Quantum Paradoxes, Dynamical Systems and Biological Models*. Springer.
-10. Müller, T., et al. (2022). *Instant Neural Graphics Primitives with a Multiresolution Hash Encoding*. ACM TOG.
+5. Dettmers, T., et al. (2024). *SpQR: A Sparse-Quantized Representation for Near-Lossless LLM Weight Compression*. ICLR.
+6. Tseng, A., et al. (2024). *QuIP#: Even Better LLM Quantization with Hadamard Incoherence and Lattice Codebooks*. ICML.
+7. Darvish Rouhani, B., et al. (2023). *Microscaling Data Formats for Deep Learning: A Standard for Multi-Vendor Hardware Support*. arXiv:2310.10537.
+8. Open Compute Project. (2023). *OCP Microscaling Formats (MX) Specification Version 1.0*.
+9. Köster, U., et al. (2017). *Flexpoint: An Adaptive Numerical Format for Deep Learning*. NeurIPS.
+10. Bengio, Y., et al. (2013). *Estimating or propagating gradients through stochastic neurons for conditional computation*. arXiv:1308.3432.
+11. Bronstein, M. M., et al. (2021). *Geometric Deep Learning: Grids, Groups, Graphs, Geodesics, and Gauges*. arXiv:2104.13478.
+12. Knuth, D. E. (1997). *The Art of Computer Programming, Volume 2: Seminumerical Algorithms*. Addison-Wesley.
+13. Omondi, A., & Premkumar, B. (2007). *Residue Number Systems: Theory and Implementation*. Imperial College Press.
+14. Bajard, J.-C., et al. (2020). *RNS for Neural Networks Hardware Accelerators*. IEEE Transactions on Computers.
+15. Hayes, B. (2001). *Third base: Ternary computing and radix economy*. American Scientist.
+16. Brusentsov, N. P., et al. (1958). *The Setun Small Automatic Digital Computer*. Moscow University Bulletin.
+17. Khrennikov, A. (1997). *Non-Archimedean Analysis: Quantum Paradoxes, Dynamical Systems and Biological Models*. Springer.
+18. Murtagh, F. (2014). *Thinking Ultrametrically: On the Metric Space of Hierarchical Classification and Data Analysis*. Data Science Journal.
+19. Müller, T., et al. (2022). *Instant Neural Graphics Primitives with a Multiresolution Hash Encoding*. ACM TOG.
+20. Laine, S., & Karras, T. (2010). *Efficient Sparse Voxel Octrees*. IEEE TVCG.
+21. Yu, A., et al. (2021). *PlenOctrees for Real-time Rendering of Neural Radiance Fields*. ICCV.

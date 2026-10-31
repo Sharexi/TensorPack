@@ -45,3 +45,11 @@ htmlcov/
 # Local experiment scratch
 scratch/
 *.log
+
+# LaTeX auxiliary files
+*.aux
+*.blg
+*.out
+*.synctex.gz
+*.fls
+*.fdb_latexmk

@@ -285,18 +285,24 @@ python reproduce.py
 
 ---
 
-## 9. Citation & Ongoing Research
+## 10. Preprint & Citation
 
-If you find this architectural direction or benchmark harness useful in your research:
+The complete preprint manuscript is available in [`paper/PAPER.md`](paper/PAPER.md) and compiled as a formal arXiv LaTeX preprint in [`paper/main.pdf`](paper/main.pdf) ([`paper/main.tex`](paper/main.tex)):
 
 ```bibtex
-@misc{sharexi2026mtc8,
-  title={MicroTensor Computing (MTC-8): An Architecture for Adaptive-Precision Micro-Tiled Tensor Arithmetic and Geometric Foundations},
-  author={Sharexi},
+@article{quaranta2026mtc8,
+  title={MicroTensor Computing (MTC-8): An Architecture for Adaptive Sub-Byte GEMM, Spatial Octrees, and Prime Residue Arithmetic},
+  author={Quaranta, Aniello},
+  journal={arXiv preprint},
   year={2026},
   url={https://github.com/Sharexi/TensorPack}
 }
 ```
 
+## Author & Acknowledgments
+
+- **Author**: **Aniello Quaranta** ([Sharexi](https://github.com/Sharexi)) — Conceptual formulation, mathematical architecture, geometric foundations, and research direction.
+- **AI Pair Programming Disclosure**: Developed in collaboration with Google DeepMind's Gemini / Antigravity as an interactive AI pair programmer and drafting assistant under the author's continuous architectural supervision, experimental direction, and verification.
+
 ## License
-MIT License. See [LICENSE](LICENSE) for details.
+MIT License. Copyright (c) 2026 Aniello Quaranta. See [LICENSE](LICENSE) for details.
