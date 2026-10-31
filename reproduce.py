@@ -41,12 +41,22 @@ print(f"    - Conventional INT8:  Error = {res_int8['rel_err']:.4f} (SNR: {res_i
 print(f"    - MTC-8 Joint Adapt:  Error = {res_mtc['rel_err']:.4f} (SNR: {res_mtc['snr_db']:.1f} dB) | Kernel: {res_mtc['gflops']:.2f} GFLOPS")
 print(f"    => MTC-8 achieved {res_mtc['gflops']/res_int8['gflops']:.2f}x speedup over INT8 and {res_int4['rel_err']/res_mtc['rel_err']:.1f}x lower error than INT4!")
 
-# 3. Run 3D Spatial Geometry and Prime Resiude Systems
-print("\n[Step 3/3] Evaluating 3D Spatial Octrees and Number-Theoretic Primes...")
+# 3. Run 3D Spatial Geometry and Prime Residue Systems
+print("\n[Step 3/5] Evaluating 3D Spatial Octrees and Number-Theoretic Primes...")
 from mtc.benchmarks.benchmark_geometric import benchmark_3d_spatial, benchmark_primes_and_ternary
 
 benchmark_3d_spatial()
 benchmark_primes_and_ternary()
+
+# 4. Neural Network Inference Benchmark
+print("\n[Step 4/5] Evaluating Neural Network Inference (528K DeepMLP)...")
+from mtc.benchmarks.benchmark_inference import benchmark_model_inference
+benchmark_model_inference(batch_sizes=[16], repeats=5)
+
+# 5. Neural Network Training Benchmark
+print("\n[Step 5/5] Evaluating Neural Network Training (BitNet STE QAT vs FP32)...")
+from mtc.benchmarks.benchmark_training import benchmark_training_convergence
+benchmark_training_convergence(epochs=5, batch_size=32)
 
 print("\n" + "=" * 75)
 print("  REPRODUCTION COMPLETE - All empirical claims verified.")
