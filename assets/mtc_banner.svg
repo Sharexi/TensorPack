@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 440" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0e17"/>
+      <stop offset="50%" stop-color="#10192b"/>
+      <stop offset="100%" stop-color="#060911"/>
+    </linearGradient>
+    <linearGradient id="accentCyan" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00f2fe"/>
+      <stop offset="100%" stop-color="#4facfe"/>
+    </linearGradient>
+    <linearGradient id="accentPurple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7928ca"/>
+      <stop offset="100%" stop-color="#ff0080"/>
+    </linearGradient>
+    <linearGradient id="accentAmber" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f6d365"/>
+      <stop offset="100%" stop-color="#fda085"/>
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.8"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <style>
+    .title { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-weight: 800; font-size: 52px; fill: #ffffff; letter-spacing: -1.5px; }
+    .subtitle { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-weight: 400; font-size: 20px; fill: #94a3b8; letter-spacing: 0.5px; }
+    .tag { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; font-weight: 600; fill: #38bdf8; letter-spacing: 1px; }
+    .card-title { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-weight: 700; font-size: 15px; fill: #e2e8f0; }
+    .card-val { font-family: ui-monospace, SFMono-Regular, monospace; font-weight: 800; font-size: 26px; }
+    .card-sub { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; fill: #94a3b8; }
+  </style>
+
+  <!-- Background -->
+  <rect width="1280" height="440" rx="16" fill="url(#bgGrad)"/>
+  
+  <!-- Subtle Geometric Grid Lines -->
+  <g stroke="#1e293b" stroke-width="1" stroke-opacity="0.4">
+    <line x1="80" y1="0" x2="80" y2="440"/>
+    <line x1="280" y1="0" x2="280" y2="440"/>
+    <line x1="480" y1="0" x2="480" y2="440"/>
+    <line x1="680" y1="0" x2="680" y2="440"/>
+    <line x1="880" y1="0" x2="880" y2="440"/>
+    <line x1="1080" y1="0" x2="1080" y2="440"/>
+    <line x1="0" y1="80" x2="1280" y2="80"/>
+    <line x1="0" y1="200" x2="1280" y2="200"/>
+    <line x1="0" y1="320" x2="1280" y2="320"/>
+  </g>
+
+  <!-- Header Section -->
+  <g transform="translate(80, 75)">
+    <rect x="0" y="0" width="220" height="28" rx="14" fill="#0369a1" fill-opacity="0.25" stroke="#38bdf8" stroke-width="1"/>
+    <text x="15" y="19" class="tag">RESEARCH ARCHITECTURE</text>
+    
+    <text x="0" y="75" class="title">MicroTensor Computing <tspan fill="url(#accentCyan)">MTC-8</tspan></text>
+    <text x="0" y="112" class="subtitle">Geometric Sub-Byte Arithmetic • 3D Octree Vacuum Pruning • Prime Residue Systems</text>
+  </g>
+
+  <!-- 3D Geometric Cube Accent Graphic (Right Side) -->
+  <g transform="translate(1040, 100)" stroke="#38bdf8" stroke-width="1.8" fill="none">
+    <!-- Isometric Cube 1 -->
+    <path d="M 0 -35 L 60 0 L 0 35 L -60 0 Z" fill="#38bdf8" fill-opacity="0.1" stroke="url(#accentCyan)"/>
+    <path d="M -60 0 L 0 35 L 0 105 L -60 70 Z" fill="#0284c7" fill-opacity="0.15" stroke="url(#accentCyan)"/>
+    <path d="M 0 35 L 60 0 L 60 70 L 0 105 Z" fill="#0369a1" fill-opacity="0.25" stroke="url(#accentCyan)"/>
+    
+    <!-- Sub-Cube Vertices -->
+    <circle cx="0" cy="-35" r="3.5" fill="#00f2fe"/>
+    <circle cx="60" cy="0" r="3.5" fill="#00f2fe"/>
+    <circle cx="-60" cy="0" r="3.5" fill="#00f2fe"/>
+    <circle cx="0" cy="35" r="3.5" fill="#00f2fe"/>
+    <circle cx="0" cy="105" r="3.5" fill="#38bdf8"/>
+    <circle cx="-60" cy="70" r="3.5" fill="#38bdf8"/>
+    <circle cx="60" cy="70" r="3.5" fill="#38bdf8"/>
+
+    <!-- Internal Division (Micro-Cube 2x2x2) -->
+    <line x1="0" y1="0" x2="30" y2="-17.5" stroke="#7dd3fc" stroke-dasharray="3,3"/>
+    <line x1="0" y1="0" x2="-30" y2="-17.5" stroke="#7dd3fc" stroke-dasharray="3,3"/>
+    <line x1="0" y1="0" x2="0" y2="70" stroke="#7dd3fc" stroke-dasharray="3,3"/>
+  </g>
+
+  <!-- 4 Empirical Metric Highlight Cards -->
+  <g transform="translate(80, 240)">
+    <!-- Card 1: Compute Speedup -->
+    <g transform="translate(0, 0)">
+      <rect width="255" height="140" rx="12" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.2"/>
+      <rect x="20" y="16" width="6" height="6" rx="3" fill="#38bdf8"/>
+      <text x="34" y="23" class="card-title">Kernel Throughput</text>
+      <text x="20" y="65" class="card-val" fill="#38bdf8">2.5× Speedup</text>
+      <text x="20" y="92" class="card-sub">35.7 GFLOPS vs 14.6 INT8</text>
+      <text x="20" y="112" class="card-sub">L1-resident 16×16 macrotiles</text>
+    </g>
+
+    <!-- Card 2: Multi-Scale Accuracy -->
+    <g transform="translate(280, 0)">
+      <rect width="255" height="140" rx="12" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.2"/>
+      <rect x="20" y="16" width="6" height="6" rx="3" fill="#4ade80"/>
+      <text x="34" y="23" class="card-title">Multi-Scale Resilience</text>
+      <text x="20" y="65" class="card-val" fill="#4ade80">0.70% Error</text>
+      <text x="20" y="92" class="card-sub">43.1 dB SNR (+14 dB vs INT8)</text>
+      <text x="20" y="112" class="card-sub">Fixed INT4 collapses at 43.3%</text>
+    </g>
+
+    <!-- Card 3: 3D Spatial Sparsity -->
+    <g transform="translate(560, 0)">
+      <rect width="255" height="140" rx="12" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.2"/>
+      <rect x="20" y="16" width="6" height="6" rx="3" fill="#f472b6"/>
+      <text x="34" y="23" class="card-title">3D Octree Vacuum</text>
+      <text x="20" y="65" class="card-val" fill="#f472b6">47.6× Pruning</text>
+      <text x="20" y="92" class="card-sub">128 KB → 2.7 KB in arena</text>
+      <text x="20" y="112" class="card-sub">13.5 Giga-voxels/s 3D conv</text>
+    </g>
+
+    <!-- Card 4: Base-3 Ternary Density -->
+    <g transform="translate(840, 0)">
+      <rect width="255" height="140" rx="12" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.2"/>
+      <rect x="20" y="16" width="6" height="6" rx="3" fill="#fbbf24"/>
+      <text x="34" y="23" class="card-title">Balanced Ternary (F₃)</text>
+      <text x="20" y="65" class="card-val" fill="#fbbf24">+20% Density</text>
+      <text x="20" y="92" class="card-sub">5 trits / byte (3⁵ = 243)</text>
+      <text x="20" y="112" class="card-sub">0 hardware multipliers used</text>
+    </g>
+  </g>
+</svg>

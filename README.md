@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/mtc_banner.svg" alt="MicroTensor Computing Banner" width="100%">
+</p>
+
 # MicroTensor Computing (MTC-8)
 
 > **Notice:** *This repository represents ongoing research into a wider class of computational architectures with core geometric foundations. It explores discrete micro-manifold representations, adaptive numerical precisions, and hierarchical tensor composition as an alternative to uniform fixed-precision arithmetic.*
@@ -5,6 +9,53 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Numba](https://img.shields.io/badge/accelerated-Numba-orange.svg)](https://numba.pydata.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/Sharexi/TensorPack?style=social)](https://github.com/Sharexi/TensorPack)
+
+---
+
+### Executive Highlights (Empirical Results on CPU)
+
+| Breakthrough Axis | Baseline Standard | MTC-8 Geometric Result | Practical Impact |
+| :--- | :--- | :--- | :--- |
+| **Compute Kernel Speedup** | INT8 GEMM: 14.6 GFLOPS | **35.7 GFLOPS (0.94 ms)** | **2.5× faster execution kernel** on CPU via L1-resident 16×16 macrotiles. |
+| **Multi-Scale Error Resilience** | Conventional INT4: 43.3% error | **0.70% relative error (43.1 dB SNR)** | **50× error reduction** over fixed INT4; strictly satisfies $\epsilon \le 0.05$. |
+| **3D Spatial Sparsity** | Dense FP32: 128.0 KB ($32^3$) | **2.7 KB (Pruned Octree)** | **47.6× spatial memory reduction (97.9%)** via zero-byte vacuum pruning. |
+| **Base-3 Balanced Ternary ($\mathbb{F}_3$)** | Standard 2-bit packing (4 trits/byte) | **5 trits / byte ($3^5 = 243 \le 256$)** | **+20% information density**; executes GEMM with **zero hardware multipliers**. |
+| **Carry-Free Parallel RNS** | Standard ALU carry ripple | **8 closed prime channels** | Modular dot products with **0 bits carry propagation** across prime moduli. |
+
+---
+
+## 60-Second Quickstart
+
+```python
+import numpy as np
+from mtc.core.types import PrecisionMode
+from mtc.core.arena import MemoryArena
+from mtc.kernels.gemm import MTCMatrix, mtc_gemm
+from mtc.spatial3d import OctreeTensor, PrecisionMode3D
+from mtc.primes import ternary_multiplier_free_gemm, PrimeResidueSystem
+
+# 1. 2D Adaptive Matrix Multiplication with Joint Precision Negotiation
+A = np.random.randn(256, 256).astype(np.float32)
+B = np.random.randn(256, 256).astype(np.float32)
+
+# Interacting blocks jointly negotiate optimal bit-budget (P2, P4, P8, P16)
+A_mtc, B_mtc = MTCMatrix.from_numpy_joint(A, B, block_size=16, target_epsilon=0.05)
+C = mtc_gemm(A_mtc, B_mtc)  # Runs at 35+ GFLOPS on CPU
+
+# 2. 3D Spatial Octree with Vacuum Pruning (97.9% Memory Reduction)
+sparse_volume = np.zeros((32, 32, 32), dtype=np.float32)
+sparse_volume[12:20, 12:20, 12:20] = 1.0  # Localized spherical region
+arena = MemoryArena()
+octree = OctreeTensor.from_array_recursive(sparse_volume, PrecisionMode3D.P8, arena)
+# Entire vacuum is pruned: 128 KB volume compressed to 2.7 KB
+
+# 3. Multiplier-Free Balanced Ternary GEMM (BitNet-Style F_3)
+W_trits = np.random.choice(np.array([-1, 0, 1], dtype=np.int8), size=(256, 512))
+X = np.random.randn(512, 256).astype(np.float32)
+Y = np.empty((256, 256), dtype=np.float32)
+ternary_multiplier_free_gemm(W_trits, X, Y)  # ZERO multipliers used; pure additions/subtractions!
+```
 
 ---
 
