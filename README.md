@@ -6,6 +6,7 @@
 
 > **Notice:** *This repository represents ongoing research into a wider class of computational architectures with core geometric foundations. It explores discrete micro-manifold representations, adaptive numerical precisions, and hierarchical tensor composition as an alternative to uniform fixed-precision arithmetic.*
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23843968.svg)](https://zenodo.org/records/23843968)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Numba](https://img.shields.io/badge/accelerated-Numba-orange.svg)](https://numba.pydata.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -285,17 +286,25 @@ python reproduce.py
 
 ---
 
-## 10. Preprint & Citation
+## 10. Research Paper & Citation
 
-The complete preprint manuscript is available in [`paper/PAPER.md`](paper/PAPER.md) and compiled as a formal arXiv LaTeX preprint in [`paper/main.pdf`](paper/main.pdf) ([`paper/main.tex`](paper/main.tex)):
+This repository serves as the official reference implementation, test harness, and empirical benchmark suite for the research paper:
+
+> **MicroTensor Computing (MTC-8): An Architecture for Adaptive Sub-Byte GEMM, Spatial Octrees, and Prime Residue Arithmetic**  
+> **Author:** Aniello Quaranta  
+> **Permanent DOI:** [10.5281/zenodo.23843968](https://doi.org/10.5281/zenodo.23843968)  
+> **Preprint Publication:** [https://zenodo.org/records/23843968](https://zenodo.org/records/23843968)
+
+To cite this work or software repository:
 
 ```bibtex
 @article{quaranta2026mtc8,
   title={MicroTensor Computing (MTC-8): An Architecture for Adaptive Sub-Byte GEMM, Spatial Octrees, and Prime Residue Arithmetic},
   author={Quaranta, Aniello},
-  journal={arXiv preprint},
+  journal={Zenodo Preprint},
   year={2026},
-  url={https://github.com/Sharexi/TensorPack}
+  doi={10.5281/zenodo.23843968},
+  url={https://zenodo.org/records/23843968}
 }
 ```
 
