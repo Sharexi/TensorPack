@@ -103,14 +103,26 @@ The atomic storage unit is an **invariant 8-bit byte** whose interpretation is s
 
 ### Layer 2: Structural Pointer Tensors
 Rather than assigning pointers to individual scalars, matrices are organized as a hierarchical grid:
-$$P = \begin{pmatrix} r_{11} & r_{12} \\ r_{21} & r_{22} \end{pmatrix}$$
+
+$$
+P = \begin{bmatrix} r_{11} & r_{12} \\ r_{21} & r_{22} \end{bmatrix}
+$$
+
 Each entry is an offset into a contiguous memory arena or a reference to an operation node (`OP_MATMUL`, `OP_ADD`, `OP_TRANSPOSE`). This enables zero-copy transposition, quadtree composition, and lazy execution graphs.
 
 ### Layer 3: Joint Precision Negotiation
 Traditional quantization selects precision independently per tensor. In MTC, interacting blocks $A_{ik}$ and $B_{kj}$ negotiate their precision jointly based on the forward product error bound:
-$$\|\Delta(A_{ik} B_{kj})\|_F \le \|\Delta A_{ik}\|_F \|B_{kj}\|_F + \|A_{ik}\|_F \|\Delta B_{kj}\|_F + \|\Delta A_{ik}\|_F \|\Delta B_{kj}\|_F$$
+
+$$
+\|\Delta(A_{ik} B_{kj})\|_F \le \|\Delta A_{ik}\|_F \|B_{kj}\|_F + \|A_{ik}\|_F \|\Delta B_{kj}\|_F + \|\Delta A_{ik}\|_F \|\Delta B_{kj}\|_F
+$$
+
 Subject to reduction dimension scaling:
-$$\text{allowed\_error} = \frac{\epsilon_{\text{target}}}{\sqrt{K / B_s}}$$
+
+$$
+\epsilon_{\text{block}} = \frac{\epsilon_{\text{target}}}{\sqrt{K / B_s}}
+$$
+
 The engine selects the minimum bit-budget pair $(p_A, p_B) \in \{2, 4, 8, 16\}^2$ satisfying the bound.
 
 ---
@@ -118,11 +130,23 @@ The engine selects the minimum bit-budget pair $(p_A, p_B) \in \{2, 4, 8, 16\}^2
 ## 3. The Elementary Multiplication Primitive
 
 For two $2\times 2$ micro-tensors:
-$$A = \begin{pmatrix} a & b \\ c & d \end{pmatrix}, \qquad B = \begin{pmatrix} e & f \\ g & h \end{pmatrix}$$
+
+$$
+A = \begin{bmatrix} a & b \\ c & d \end{bmatrix}, \qquad B = \begin{bmatrix} e & f \\ g & h \end{bmatrix}
+$$
+
 We define the native instruction:
-$$\operatorname{MTMUL}(A, B, C)$$
+
+$$
+\mathrm{MTMUL}(A, B, C)
+$$
+
 Where inner products accumulate strictly in **INT32 / FP32** before applying block scales:
-$$C_{ij} += (\text{scale}_A \cdot \text{scale}_B) \cdot (A_{ik} B_{kj})_{\mathbb{Z}}$$
+
+$$
+C_{ij} \leftarrow C_{ij} + (\text{scale}_A \cdot \text{scale}_B) \sum_k (A_{ik} B_{kj})_{\mathbb{Z}}
+$$
+
 **Low-precision storage never compromises accumulation accuracy.**
 
 ---
@@ -185,7 +209,11 @@ Primes introduce three fundamental properties to geometric computing:
 
 ### A. Residue Number Systems (RNS) — Carry-Free Parallel Arithmetic
 Numbers are decomposed across a basis of coprime prime moduli $\mathcal{B} = \{p_1, p_2, \dots, p_k\}$ via the Chinese Remainder Theorem (CRT):
-$$X \iff (x \bmod p_1, \; x \bmod p_2, \; \dots, \; x \bmod p_k)$$
+
+$$
+X \iff (x \bmod p_1, \; x \bmod p_2, \; \dots, \; x \bmod p_k)
+$$
+
 - **Zero carry propagation**: Vector dot products and GEMM execute independently and in parallel across prime channels.
 - Modular channels eliminate ALU carry ripple chains entirely.
 
@@ -196,7 +224,11 @@ $$X \iff (x \bmod p_1, \; x \bmod p_2, \; \dots, \; x \bmod p_k)$$
 
 ### C. $p$-Adic Ultrametric Geometry
 Hierarchical tree structures (quadtrees, octrees) are fundamentally **non-Archimedean ultrametric spaces** satisfying the strong triangle inequality:
-$$d_p(x, z) \le \max\big(d_p(x, y), \; d_p(y, z)\big)$$
+
+$$
+d_p(x, z) \le \max\big(d_p(x, y), \; d_p(y, z)\big)
+$$
+
 Lowest Common Ancestor (LCA) tree traversal is mathematically isometric to $p$-adic distance, allowing hierarchical and scale-free semantic embeddings with zero topological distortion.
 
 ---
