@@ -56,7 +56,7 @@ def benchmark_training_convergence(epochs: int = 15, batch_size: int = 32):
 
     print(f"\n[1. Model Parameter Memory Footprint During Training]")
     print(f"  - FP32 Model:          {m_fp32.total_bytes / 1024.0:.1f} KB (32 bits/weight)")
-    print(f"  - Balanced Ternary:    {m_ternary.total_bytes / 1024.0:.1f} KB (1.58 bits/weight, 19.1x compression!)")
+    print(f"  - Balanced Ternary:    {m_ternary.total_bytes / 1024.0:.1f} KB (1.6 bits/weight packed)")
 
     # Train FP32 Model
     print(f"\n[2. Training FP32 Reference Model ({epochs} Epochs)...]")
@@ -82,7 +82,7 @@ def benchmark_training_convergence(epochs: int = 15, batch_size: int = 32):
     t_fp32_total = (time.perf_counter() - t0) * 1000.0
 
     # Train Balanced Ternary Model
-    print(f"\n[3. Training Balanced Ternary Model via Multiplier-Free QAT ({epochs} Epochs)...]")
+    print(f"\n[3. Training Balanced Ternary Model via STE QAT ({epochs} Epochs)...]")
     t0 = time.perf_counter()
     loss_history_ternary = []
 
@@ -100,7 +100,7 @@ def benchmark_training_convergence(epochs: int = 15, batch_size: int = 32):
         avg_loss = epoch_loss / n_batches
         loss_history_ternary.append(avg_loss)
         if (epoch + 1) % 5 == 0 or epoch == 0:
-            print(f"  Epoch {epoch+1:2d}/{epochs} | Loss: {avg_loss:.4f} (Zero multipliers in forward & backward!)")
+            print(f"  Epoch {epoch+1:2d}/{epochs} | Loss: {avg_loss:.4f}")
 
     t_ternary_total = (time.perf_counter() - t0) * 1000.0
 
@@ -115,9 +115,11 @@ def benchmark_training_convergence(epochs: int = 15, batch_size: int = 32):
     print(f"\nBalanced Ternary QAT (BitNet-style STE):")
     print(f"  - Initial Loss:        {loss_history_ternary[0]:.4f} -> Final Loss: {loss_history_ternary[-1]:.4f} (Delta: -{loss_history_ternary[0] - loss_history_ternary[-1]:.4f})")
     print(f"  - Total Train Time:    {t_ternary_total:.2f} ms ({t_ternary_total / (epochs * n_batches):.2f} ms/step)")
-    print(f"  - Parameter Storage:   {m_ternary.total_bytes / 1024.0:.1f} KB (19.1x less weight memory!)")
-    print(f"  - Multipliers Used:    ZERO in layer forward & backward passes!")
-    print(f"  - Convergence Status:  SUCCESS (Loss reduced steadily from {loss_history_ternary[0]:.4f} to {loss_history_ternary[-1]:.4f})")
+    print(f"  - Parameter Storage:   {m_ternary.total_bytes / 1024.0:.1f} KB ")
+    chance = float(np.log(16))
+    learned = loss_history_ternary[-1] < 0.95 * chance
+    print(f"  - Chance-level loss:   {chance:.4f} (ln 16)")
+    print(f"  - Convergence Status:  {'LEARNING' if learned else 'NOT LEARNING (loss at chance level)'}")
 
 
 if __name__ == "__main__":

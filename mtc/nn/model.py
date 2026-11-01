@@ -110,7 +110,7 @@ class DeepMLP_MTCAdaptive:
 
 
 class DeepMLP_Ternary:
-    """Multi-layer Balanced Ternary (BitNet-style) Model with Multiplier-Free Compute & Training."""
+    """Multi-layer Balanced Ternary (BitNet-style) Model (add/subtract-only ternary kernels, STE training)."""
 
     def __init__(self, in_dim: int = 256, hidden_dim: int = 512, out_dim: int = 16, seed: int = 42):
         self.fc1 = LinearTernaryBitNet(in_dim, hidden_dim, seed=seed)

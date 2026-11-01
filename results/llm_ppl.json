@@ -1,0 +1,171 @@
+{
+ "config": {
+  "model": "Qwen/Qwen2.5-0.5B",
+  "seqlen": 1024,
+  "n_eval": 24,
+  "n_calib": 32,
+  "calib_len": 512,
+  "xcal_rows": 256,
+  "out": "results",
+  "threads": 8,
+  "methods": "fp32,baselines,rd,rd_ablation,rd_bf16,qt",
+  "tag": ""
+ },
+ "eval_tokens": 24576,
+ "methods": [
+  {
+   "name": "FP32 (unquantized)",
+   "family": "reference",
+   "bits": 32.0,
+   "ppl": 13.985758322751018,
+   "quant_seconds": 0.0
+  },
+  {
+   "name": "RTN g128 INT3",
+   "family": "RTN",
+   "bits": 3.125,
+   "ppl": 202.62719840905933,
+   "quant_seconds": 9.5
+  },
+  {
+   "name": "RTN g128 INT4",
+   "family": "RTN",
+   "bits": 4.125,
+   "ppl": 19.31392766669989,
+   "quant_seconds": 3.9
+  },
+  {
+   "name": "RTN g32 INT4 (Q4_0-style)",
+   "family": "RTN",
+   "bits": 4.5,
+   "ppl": 16.54578460800703,
+   "quant_seconds": 3.3
+  },
+  {
+   "name": "MXFP4",
+   "family": "MXFP4",
+   "bits": 4.25,
+   "ppl": 17.421502092420205,
+   "quant_seconds": 18.6
+  },
+  {
+   "name": "NVFP4",
+   "family": "NVFP4",
+   "bits": 4.5,
+   "ppl": 15.461713049150617,
+   "quant_seconds": 19.4
+  },
+  {
+   "name": "AWQ g128 INT3",
+   "family": "AWQ",
+   "bits": 3.125,
+   "ppl": 113.59952978539698,
+   "quant_seconds": 59.1
+  },
+  {
+   "name": "AWQ g128 INT4",
+   "family": "AWQ",
+   "bits": 4.125,
+   "ppl": 18.906154368283325,
+   "quant_seconds": 60.9
+  },
+  {
+   "name": "MTC-RD @ 2.5 b",
+   "family": "MTC-RD",
+   "bits": 2.5,
+   "ppl": 543.4850737822399,
+   "quant_seconds": 25.5
+  },
+  {
+   "name": "MTC-RD @ 3.125 b",
+   "family": "MTC-RD",
+   "bits": 3.125,
+   "ppl": 84.86346028516334,
+   "quant_seconds": 25.5
+  },
+  {
+   "name": "MTC-RD @ 4.125 b",
+   "family": "MTC-RD",
+   "bits": 4.125,
+   "ppl": 16.555765388042616,
+   "quant_seconds": 25.5
+  },
+  {
+   "name": "MTC-RD @ 4.25 b",
+   "family": "MTC-RD",
+   "bits": 4.25,
+   "ppl": 15.941708635480287,
+   "quant_seconds": 25.5
+  },
+  {
+   "name": "MTC-RD @ 4.5 b",
+   "family": "MTC-RD",
+   "bits": 4.5,
+   "ppl": 15.258194301672681,
+   "quant_seconds": 25.5
+  },
+  {
+   "name": "MTC-RD, no importance (ablation) @ 3.125 b",
+   "family": "MTC-RD, no importance (ablation)",
+   "bits": 3.125,
+   "ppl": 902.7545297528017,
+   "quant_seconds": 51.0
+  },
+  {
+   "name": "MTC-RD, no importance (ablation) @ 4.125 b",
+   "family": "MTC-RD, no importance (ablation)",
+   "bits": 4.125,
+   "ppl": 22.53709035752761,
+   "quant_seconds": 51.0
+  },
+  {
+   "name": "MTC-RD 16x16, bf16 scales (ablation) @ 3.125 b",
+   "family": "MTC-RD 16x16, bf16 scales (ablation)",
+   "bits": 3.125,
+   "ppl": 68.66271183914124,
+   "quant_seconds": 51.9
+  },
+  {
+   "name": "MTC-RD 16x16, bf16 scales (ablation) @ 4.125 b",
+   "family": "MTC-RD 16x16, bf16 scales (ablation)",
+   "bits": 4.125,
+   "ppl": 16.277223323165185,
+   "quant_seconds": 51.9
+  },
+  {
+   "name": "MTC-QT quadtree 32-4 @ 2.5 b",
+   "family": "MTC-QT",
+   "bits": 2.4999,
+   "ppl": 266.5041386292397,
+   "quant_seconds": 228.3
+  },
+  {
+   "name": "MTC-QT quadtree 32-4 @ 3.125 b",
+   "family": "MTC-QT",
+   "bits": 3.125,
+   "ppl": 29.75680315847564,
+   "quant_seconds": 228.3
+  },
+  {
+   "name": "MTC-QT quadtree 32-4 @ 4.125 b",
+   "family": "MTC-QT",
+   "bits": 4.125,
+   "ppl": 15.701936061047869,
+   "quant_seconds": 228.3
+  },
+  {
+   "name": "MTC-QT quadtree 32-4 @ 4.25 b",
+   "family": "MTC-QT",
+   "bits": 4.25,
+   "ppl": 15.330593566576953,
+   "quant_seconds": 228.3
+  },
+  {
+   "name": "MTC-QT quadtree 32-4 @ 4.5 b",
+   "family": "MTC-QT",
+   "bits": 4.5,
+   "ppl": 14.906824108590973,
+   "quant_seconds": 228.3
+  }
+ ]
+}

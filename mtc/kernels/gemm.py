@@ -96,6 +96,27 @@ def unpack_block_p16(raw_arena: np.ndarray, offset: int, Bs: int, out_buf: np.nd
             out_buf[r, c] = float(np.int16(u))
 
 
+@njit(fastmath=True, inline="always")
+def unpack_block_bits(raw_arena: np.ndarray, offset: int, Bs: int, bits: int, out_buf: np.ndarray):
+    """
+    Unpack Bs x Bs signed `bits`-wide codes (3, 5, 6) from a little-endian
+    bitstream: element i occupies bits [i*bits, (i+1)*bits) of the block.
+    """
+    mask = (1 << bits) - 1
+    sign = 1 << (bits - 1)
+    for i in range(Bs * Bs):
+        bitpos = i * bits
+        byte = offset + (bitpos >> 3)
+        shift = bitpos & 7
+        word = int(raw_arena[byte])
+        if shift + bits > 8:
+            word |= int(raw_arena[byte + 1]) << 8
+        v = (word >> shift) & mask
+        if v >= sign:
+            v -= 1 << bits
+        out_buf[i // Bs, i % Bs] = float(v)
+
+
 # =========================================================================
 # Macrotiled Core GEMM Kernel
 # =========================================================================
@@ -147,6 +168,10 @@ def mtc_gemm_core_kernel(
                 off_b = offsets_b[bk, bj]
                 sc_b = scales_b[bk, bj]
 
+                # P0 blocks are exactly zero: skip the whole block product
+                if p_a == 0 or p_b == 0:
+                    continue
+
                 # Unpack Block A
                 if p_a == 2:
                     unpack_block_p2(arena_a, off_a, Bs, a_buf)
@@ -156,6 +181,8 @@ def mtc_gemm_core_kernel(
                     unpack_block_p8(arena_a, off_a, Bs, a_buf)
                 elif p_a == 16:
                     unpack_block_p16(arena_a, off_a, Bs, a_buf)
+                else:
+                    unpack_block_bits(arena_a, off_a, Bs, p_a, a_buf)
 
                 # Unpack Block B
                 if p_b == 2:
@@ -166,14 +193,16 @@ def mtc_gemm_core_kernel(
                     unpack_block_p8(arena_b, off_b, Bs, b_buf)
                 elif p_b == 16:
                     unpack_block_p16(arena_b, off_b, Bs, b_buf)
+                else:
+                    unpack_block_bits(arena_b, off_b, Bs, p_b, b_buf)
 
                 # Multiply-accumulate unpacked blocks into c_acc
                 scale_prod = sc_a * sc_b
                 for r in range(Bs):
                     for k in range(Bs):
-                        val_a = a_buf[r, k]
+                        val_a = a_buf[r, k] * scale_prod
                         for c in range(Bs):
-                            c_acc[r, c] += (val_a * b_buf[k, c]) * scale_prod
+                            c_acc[r, c] += val_a * b_buf[k, c]
 
             # Commit c_acc into out_c
             for r in range(Bs):
@@ -400,6 +429,84 @@ class MTCMatrix:
         )
         return mtc_a, mtc_b
 
+    @classmethod
+    def from_allocation(cls, matrix: np.ndarray, modes: np.ndarray, scales: np.ndarray, block_size: int) -> "MTCMatrix":
+        """
+        Pack a matrix into the arena given per-block modes and scales
+        (e.g. from mtc.core.allocation.rd_allocate). Vectorized; blocks are laid
+        out in row-major block order, P0 blocks occupy zero bytes.
+        """
+        from mtc.core.allocation import to_blocks, quantize_blocks
+
+        arr = np.asarray(matrix, dtype=np.float32)
+        H, W = arr.shape
+        Bs = block_size
+        blocks = to_blocks(arr, Bs)
+        nbh, nbw = blocks.shape[:2]
+        modes = np.asarray(modes, dtype=np.uint8).reshape(nbh, nbw)
+        scales = np.asarray(scales, dtype=np.float32).reshape(nbh, nbw)
+
+        sizes = (modes.astype(np.int64) * Bs * Bs) // 8
+        flat_offsets = np.concatenate([[0], np.cumsum(sizes.ravel())[:-1]])
+        total = int(sizes.sum())
+        arena = MemoryArena(capacity_bytes=max(total, 1))
+        base = arena.allocate(total, alignment=2)
+        offsets = (flat_offsets + base).astype(np.uint32).reshape(nbh, nbw)
+        buf = arena.raw_buffer
+
+        for m in (2, 3, 4, 5, 6, 8, 16):
+            sel = modes == m
+            if not sel.any():
+                continue
+            q = quantize_blocks(blocks[sel][None], m, scales[sel][None])[0]
+            q = q.reshape(q.shape[0], Bs * Bs).astype(np.int32)
+            if m == 2:
+                u = (q & 0x03).reshape(q.shape[0], -1, 4)
+                packed = (u[..., 0] | (u[..., 1] << 2) | (u[..., 2] << 4) | (u[..., 3] << 6)).astype(np.uint8)
+            elif m == 4:
+                u = (q & 0x0F).reshape(q.shape[0], -1, 2)
+                packed = (u[..., 0] | (u[..., 1] << 4)).astype(np.uint8)
+            elif m == 8:
+                packed = q.astype(np.int8).view(np.uint8)
+            elif m == 16:
+                packed = q.astype("<i2").view(np.uint8)
+            else:
+                u = (q & ((1 << m) - 1)).astype(np.uint32)
+                bitplanes = ((u[..., None] >> np.arange(m, dtype=np.uint32)) & 1).astype(np.uint8)
+                packed = np.packbits(bitplanes.reshape(q.shape[0], -1), axis=1, bitorder="little")
+            dest = offsets[sel].astype(np.int64)[:, None] + np.arange(packed.shape[1])
+            buf[dest] = packed
+
+        return cls(
+            shape=(H, W),
+            block_size=Bs,
+            arena=arena,
+            offsets=offsets,
+            precisions=modes.copy(),
+            scales=np.where(modes == 0, 0.0, scales).astype(np.float32),
+            pointer_tensor=None,
+        )
+
+    @classmethod
+    def from_numpy_rd_pair(
+        cls,
+        matrix_a: np.ndarray,
+        matrix_b: np.ndarray,
+        bits_per_element: float,
+        block_size: int = 16,
+    ) -> Tuple["MTCMatrix", "MTCMatrix"]:
+        """
+        Joint rate-distortion allocation (MTC-RD) for C = A @ B at a fixed
+        bit budget (payload + metadata), packed into real arena storage.
+        """
+        from mtc.core.allocation import rd_allocate_pair
+
+        alloc_a, alloc_b = rd_allocate_pair(matrix_a, matrix_b, bits_per_element, block_size)
+        return (
+            cls.from_allocation(matrix_a, alloc_a.modes, alloc_a.scales, block_size),
+            cls.from_allocation(matrix_b, alloc_b.modes, alloc_b.scales, block_size),
+        )
+
     def to_array(self) -> np.ndarray:
         """Reconstruct full float32 matrix from blocks in arena."""
         H, W = self.shape
@@ -412,9 +519,11 @@ class MTCMatrix:
                 p = self.precisions[bi, bj]
                 off = self.offsets[bi, bj]
                 sc = self.scales[bi, bj]
-                temp = np.empty((Bs, Bs), dtype=np.float32)
+                temp = np.zeros((Bs, Bs), dtype=np.float32)
 
-                if p == 2:
+                if p == 0:
+                    pass
+                elif p == 2:
                     unpack_block_p2(self.arena.raw_buffer, off, Bs, temp)
                 elif p == 4:
                     unpack_block_p4(self.arena.raw_buffer, off, Bs, temp)
@@ -422,6 +531,8 @@ class MTCMatrix:
                     unpack_block_p8(self.arena.raw_buffer, off, Bs, temp)
                 elif p == 16:
                     unpack_block_p16(self.arena.raw_buffer, off, Bs, temp)
+                else:
+                    unpack_block_bits(self.arena.raw_buffer, off, Bs, int(p), temp)
 
                 out[bi * Bs : (bi + 1) * Bs, bj * Bs : (bj + 1) * Bs] = temp * sc
         return out

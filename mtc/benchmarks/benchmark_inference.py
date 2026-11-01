@@ -64,7 +64,7 @@ def benchmark_model_inference(batch_sizes=[1, 16, 64], repeats=10):
             times_mtc.append(time.perf_counter() - t0)
         t_mtc = min(times_mtc) * 1000.0
 
-        # Warmup and time Balanced Ternary (Multiplier-Free!)
+        # Warmup and time Balanced Ternary (add/subtract-only kernel)
         m_ternary.forward(X)
         times_ternary = []
         for _ in range(repeats):
@@ -83,8 +83,8 @@ def benchmark_model_inference(batch_sizes=[1, 16, 64], repeats=10):
         print(f"  [Batch {B:2d}] Latency & Throughput:")
         print(f"    - FP32 Reference:     {t_fp32:.3f} ms | {fps_fp32:8.1f} samples/sec")
         print(f"    - INT8 Quantized:     {t_int8:.3f} ms | Err: {err_int8:.4f}")
-        print(f"    - MTC-8 Adaptive:     {t_mtc:.3f} ms | {fps_mtc:8.1f} samples/sec | Err: {err_mtc:.4f} (Pre-packed)")
-        print(f"    - Balanced Ternary:   {t_ternary:.3f} ms | {fps_ternary:8.1f} samples/sec | MULTIPLIER-FREE")
+        print(f"    - MTC-8 Adaptive:     {t_mtc:.3f} ms | {fps_mtc:8.1f} samples/sec | Err: {err_mtc:.4f} (BLAS on cached dequantized weights)")
+        print(f"    - Balanced Ternary:   {t_ternary:.3f} ms | {fps_ternary:8.1f} samples/sec | add/sub only")
 
 
 if __name__ == "__main__":

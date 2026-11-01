@@ -59,7 +59,7 @@
     <text x="15" y="19" class="tag">RESEARCH ARCHITECTURE</text>
     
     <text x="0" y="75" class="title">MicroTensor Computing <tspan fill="url(#accentCyan)">MTC-8</tspan></text>
-    <text x="0" y="112" class="subtitle">Geometric Sub-Byte Arithmetic • 3D Octree Vacuum Pruning • Prime Residue Systems</text>
+    <text x="0" y="112" class="subtitle">Geometric Rate-Distortion Allocation for Sub-Byte Tensors • Quadtree Block Precision</text>
   </g>
 
   <!-- 3D Geometric Cube Accent Graphic (Right Side) -->
@@ -84,46 +84,39 @@
     <line x1="0" y1="0" x2="0" y2="70" stroke="#7dd3fc" stroke-dasharray="3,3"/>
   </g>
 
-  <!-- 4 Empirical Metric Highlight Cards -->
+  <!-- 4 Empirical Metric Highlight Cards (Qwen2.5-0.5B, WikiText-2; synthetic) -->
   <g transform="translate(80, 240)">
-    <!-- Card 1: Compute Speedup -->
     <g transform="translate(0, 0)">
       <rect width="255" height="140" rx="12" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.2"/>
       <rect x="20" y="16" width="6" height="6" rx="3" fill="#38bdf8"/>
-      <text x="34" y="23" class="card-title">Kernel Throughput</text>
-      <text x="20" y="65" class="card-val" fill="#38bdf8">2.5× Speedup</text>
-      <text x="20" y="92" class="card-sub">35.7 GFLOPS vs 14.6 INT8</text>
-      <text x="20" y="112" class="card-sub">L1-resident 16×16 macrotiles</text>
+      <text x="34" y="23" class="card-title">3-bit LLM Weights</text>
+      <text x="20" y="65" class="card-val" fill="#38bdf8">PPL 29.8</text>
+      <text x="20" y="92" class="card-sub">vs AWQ INT3 113.6 at 3.125 b</text>
+      <text x="20" y="112" class="card-sub">Qwen2.5-0.5B, WikiText-2</text>
     </g>
-
-    <!-- Card 2: Multi-Scale Accuracy -->
     <g transform="translate(280, 0)">
       <rect width="255" height="140" rx="12" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.2"/>
       <rect x="20" y="16" width="6" height="6" rx="3" fill="#4ade80"/>
-      <text x="34" y="23" class="card-title">Multi-Scale Resilience</text>
-      <text x="20" y="65" class="card-val" fill="#4ade80">0.70% Error</text>
-      <text x="20" y="92" class="card-sub">43.1 dB SNR (+14 dB vs INT8)</text>
-      <text x="20" y="112" class="card-sub">Fixed INT4 collapses at 43.3%</text>
+      <text x="34" y="23" class="card-title">4.5-bit LLM Weights</text>
+      <text x="20" y="65" class="card-val" fill="#4ade80">PPL 14.91</text>
+      <text x="20" y="92" class="card-sub">vs NVFP4 15.46 (FP32: 13.99)</text>
+      <text x="20" y="112" class="card-sub">all metadata bits counted</text>
     </g>
-
-    <!-- Card 3: 3D Spatial Sparsity -->
     <g transform="translate(560, 0)">
       <rect width="255" height="140" rx="12" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.2"/>
       <rect x="20" y="16" width="6" height="6" rx="3" fill="#f472b6"/>
-      <text x="34" y="23" class="card-title">3D Octree Vacuum</text>
-      <text x="20" y="65" class="card-val" fill="#f472b6">47.6× Pruning</text>
-      <text x="20" y="92" class="card-sub">128 KB → 2.7 KB in arena</text>
-      <text x="20" y="112" class="card-sub">13.5 Giga-voxels/s 3D conv</text>
+      <text x="34" y="23" class="card-title">Quadtree RD Tiling</text>
+      <text x="20" y="65" class="card-val" fill="#f472b6">32×32 → 4×4</text>
+      <text x="20" y="92" class="card-sub">exact Lagrangian tree pruning</text>
+      <text x="20" y="112" class="card-sub">per-leaf mode P0–P16 + scale</text>
     </g>
-
-    <!-- Card 4: Base-3 Ternary Density -->
     <g transform="translate(840, 0)">
       <rect width="255" height="140" rx="12" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.2"/>
       <rect x="20" y="16" width="6" height="6" rx="3" fill="#fbbf24"/>
-      <text x="34" y="23" class="card-title">Balanced Ternary (F₃)</text>
-      <text x="20" y="65" class="card-val" fill="#fbbf24">+20% Density</text>
-      <text x="20" y="92" class="card-sub">5 trits / byte (3⁵ = 243)</text>
-      <text x="20" y="112" class="card-sub">0 hardware multipliers used</text>
+      <text x="34" y="23" class="card-title">Multi-Scale Tensors</text>
+      <text x="20" y="65" class="card-val" fill="#fbbf24">35× lower error</text>
+      <text x="20" y="92" class="card-sub">0.0039 vs NVFP4 0.135</text>
+      <text x="20" y="112" class="card-sub">synthetic; 4.25 b vs NVFP4 4.5 b</text>
     </g>
   </g>
 </svg>

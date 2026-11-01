@@ -4,9 +4,8 @@
 
 # MicroTensor Computing (MTC-8)
 
-> **Notice:** *This repository represents ongoing research into a wider class of computational architectures with core geometric foundations. It explores discrete micro-manifold representations, adaptive numerical precisions, and hierarchical tensor composition as an alternative to uniform fixed-precision arithmetic.*
+> **Notice:** *This repository is ongoing research into tensor representations with geometric structure. It explores tensors partitioned into micro-blocks, each with its own numerical precision, and hierarchical tiling, as an alternative to uniform fixed-precision storage.*
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23843968.svg)](https://zenodo.org/records/23843968)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Numba](https://img.shields.io/badge/accelerated-Numba-orange.svg)](https://numba.pydata.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -14,15 +13,46 @@
 
 ---
 
-### Executive Highlights (Empirical Results on CPU)
+## Headline Result: Rate-Distortion Geometry for LLM Weight Quantization
 
-| Breakthrough Axis | Baseline Standard | MTC-8 Geometric Result | Practical Impact |
+The core MTC idea is that **the geometry of a tensor should decide where the bits go**. Its strongest form here is **MTC-QT**:
+
+- A quadtree tiles each weight matrix with blocks of 32×32 down to 4×4.
+- Every leaf picks its own precision from {P0, P2, P3, P4, P5, P6, P8, P16} and its own bf16 scale.
+- An exact Lagrangian rate-distortion optimization chooses the tiling and precisions, using an activation-aware (diagonal-Hessian) distortion.
+
+**Qwen2.5-0.5B, WikiText-2 perplexity (lower is better; FP32 = 13.99).** All methods quantize weights only and are evaluated on the same 24,576 test tokens. *Bits/weight* counts **everything stored**: payload, scales, mode bytes and split flags.
+
+| Bits / weight | Best baseline at that budget | MTC-RD (fixed 16×16) | **MTC-QT (quadtree)** |
 | :--- | :--- | :--- | :--- |
-| **Compute Kernel Speedup** | INT8 GEMM: 14.6 GFLOPS | **35.7 GFLOPS (0.94 ms)** | **2.5× faster execution kernel** on CPU via L1-resident 16×16 macrotiles. |
-| **Multi-Scale Error Resilience** | Conventional INT4: 43.3% error | **0.70% relative error (43.1 dB SNR)** | **50× error reduction** over fixed INT4; strictly satisfies $\epsilon \le 0.05$. |
-| **3D Spatial Sparsity** | Dense FP32: 128.0 KB ($32^3$) | **2.7 KB (Pruned Octree)** | **47.6× spatial memory reduction (97.9%)** via zero-byte vacuum pruning. |
-| **Base-3 Balanced Ternary ($\mathbb{F}_3$)** | Standard 2-bit packing (4 trits/byte) | **5 trits / byte ($3^5 = 243 \le 256$)** | **+20% information density**; executes GEMM with **zero hardware multipliers**. |
-| **Carry-Free Parallel RNS** | Standard ALU carry ripple | **8 closed prime channels** | Modular dot products with **0 bits carry propagation** across prime moduli. |
+| 2.5 | (none) | 543 | **267** |
+| 3.125 | AWQ g128 INT3: 113.6 (RTN: 202.6) | 84.9 | **29.8** |
+| 4.125 | AWQ g128 INT4: 18.91 (RTN: 19.31) | 16.56 | **15.70** |
+| 4.25 | MXFP4: 17.42 | 15.94 | **15.33** |
+| 4.5 | NVFP4: 15.46 (RTN g32: 16.55) | 15.26 | **14.91** |
+
+- At **3.1 bits**, MTC-QT reaches perplexity 29.8, against 113.6 for AWQ at the same size.
+- At **4.5 bits**, it is within 0.92 perplexity of FP32 and beats NVFP4.
+- **Activation awareness is essential.** Without it, MTC-RD degrades from 84.9 to 902.8 at 3.125 b and from 16.6 to 22.5 at 4.125 b.
+
+Full table: [`results/llm_ppl.md`](results/llm_ppl.md). Reproduce with `python -m mtc.benchmarks.benchmark_llm` (CPU, about 75 min; downloads the model and dataset from Hugging Face).
+
+### Accuracy per bit against fair baselines (synthetic matrices)
+
+<p align="center"><img src="results/pareto.png" alt="Accuracy-per-bit Pareto curves" width="100%"></p>
+
+The baselines are block and group INT RTN (g32 / g128), MXFP4, MXINT8, NVFP4, g128 with an fp16 outlier list (swept over 0.5–4%, best point reported), and AWQ-style scaling. Every curve is plotted against total bits including metadata. Numbers: [`results/pareto.md`](results/pareto.md). Reproduce with `python -m mtc.benchmarks.benchmark_pareto`.
+
+Relative output error at 4.25 bits:
+
+| Scenario | MTC-QT | Best baseline |
+| :--- | :--- | :--- |
+| LLM-like (heavy-tailed weights, outlier activation channels) | **0.074** | NVFP4 0.114 (at 4.5 b), AWQ 0.127 |
+| Multi-scale (block energy spans 10⁻³–10²) | **0.0039** | NVFP4 0.135 (at 4.5 b) |
+| Gaussian / uniform (no structure to exploit) | **0.130 / 0.086** | g128 0.155 / 0.094 (≈ tie expected) |
+| Isolated outliers (2% at ±25) | 0.0148 | **g128 + fp16 outliers 0.0091** |
+
+**Where it loses:** on isolated scalar outliers, a sparse outlier list beats block tiling from about 3 bits up. A hybrid (quadtree plus sparse outlier side list) is the obvious next step.
 
 ---
 
@@ -30,320 +60,192 @@
 
 ```python
 import numpy as np
-from mtc.core.types import PrecisionMode
-from mtc.core.arena import MemoryArena
+from mtc.core.allocation import rd_allocate_pair
+from mtc.core.quadtree import QuadtreeRD
 from mtc.kernels.gemm import MTCMatrix, mtc_gemm
-from mtc.spatial3d import OctreeTensor, PrecisionMode3D
-from mtc.primes import ternary_multiplier_free_gemm, PrimeResidueSystem
 
-# 1. 2D Adaptive Matrix Multiplication with Joint Precision Negotiation
-A = np.random.randn(256, 256).astype(np.float32)
-B = np.random.randn(256, 256).astype(np.float32)
+W = np.random.randn(1024, 1024).astype(np.float32)        # (in_features, out_features)
+X_cal = np.random.randn(256, 1024).astype(np.float32)      # calibration activations
+h = (X_cal ** 2).mean(axis=0)                             # diagonal-Hessian importance per input row
 
-# Interacting blocks jointly negotiate optimal bit-budget (P2, P4, P8, P16)
-A_mtc, B_mtc = MTCMatrix.from_numpy_joint(A, B, block_size=16, target_epsilon=0.05)
-C = mtc_gemm(A_mtc, B_mtc)  # Runs at 35+ GFLOPS on CPU
+# 1. Variable-block-size (quadtree) RD allocation at an exact total-bit budget
+qt = QuadtreeRD(W, h, sizes=(32, 16, 8, 4))                # one scale search, many budgets
+alloc = qt.select(3.125)                                   # bits/weight incl. all metadata
+print(alloc.bits_per_element, alloc.leaf_area_fraction())
+W_hat = alloc.dequant
 
-# 2. 3D Spatial Octree with Vacuum Pruning (97.9% Memory Reduction)
-sparse_volume = np.zeros((32, 32, 32), dtype=np.float32)
-sparse_volume[12:20, 12:20, 12:20] = 1.0  # Localized spherical region
-arena = MemoryArena()
-octree = OctreeTensor.from_array_recursive(sparse_volume, PrecisionMode3D.P8, arena)
-# Entire vacuum is pruned: 128 KB volume compressed to 2.7 KB
-
-# 3. Multiplier-Free Balanced Ternary GEMM (BitNet-Style F_3)
-W_trits = np.random.choice(np.array([-1, 0, 1], dtype=np.int8), size=(256, 512))
-X = np.random.randn(512, 256).astype(np.float32)
-Y = np.empty((256, 256), dtype=np.float32)
-ternary_multiplier_free_gemm(W_trits, X, Y)  # ZERO multipliers used; pure additions/subtractions!
+# 2. Fixed 16x16 RD allocation of both GEMM operands, packed into the arena and run on the Numba kernel
+a, b = rd_allocate_pair(X_cal, W, 4.25)                   # each operand weighted by the other's energy
+A_mtc = MTCMatrix.from_allocation(X_cal, a.modes, a.scales, 16)   # P0..P16 blocks, bit-exact
+W_mtc = MTCMatrix.from_allocation(W, b.modes, b.scales, 16)
+Y = mtc_gemm(A_mtc, W_mtc)                                # == a.dequant @ b.dequant (to ~1e-7)
 ```
 
 ---
 
-## 1. Architectural Motivation & Geometric Background
+## 1. How MTC-RD / MTC-QT Work
 
-Modern tensor compute is dominated by uniform fixed-precision representations (FP32, FP16, BF16, INT8, FP4) executed over flat, monolithic memory buffers. While optimal for uniform dense matrices, this paradigm degrades severely when processing **non-uniform distributions, multi-scale dynamics, and heavy-tailed outlier distributions** common in high-capacity foundation models and physical field simulations.
+**Distortion.** For a linear layer $Y = XW$, the output error from a weight perturbation is approximately $\sum_k h_k \|\Delta W_{k,:}\|^2$, where $h_k = \mathbb{E}[x_k^2]$ is measured on calibration data. Weight rows that see large activations matter more. Because this distortion is **additive over disjoint blocks**, the allocation problem is separable.
 
-**MicroTensor Computing (MTC)** models computational state through **discrete geometric volume elements**:
-- Tensors are treated as composite topological structures partitioned into localized geometric cells (*micro-tensors*).
-- Each cell adapts its coordinate resolution (numerical precision) to the local curvature and energy gradient of the tensor field.
-- Higher-level operations are recursively coordinated through **structural pointer hierarchies** that enable zero-copy transformations, DAG composition, and lazy fused evaluation without pointer-chasing memory penalties.
+**Candidates.** For each block $b$ and each mode $m \in \{0, 2, 3, 4, 5, 6, 8, 16\}$ bits, a parallel Numba kernel searches the MSE-optimal clipping scale (both signs of the asymmetric integer grid, optionally rounded to bf16). This gives a distortion $D_{b,m}$ at a rate $R_{b,m}$. A dense mode lattice matters: mixing only 4- and 8-bit blocks loses to plain 6-bit codes.
+
+**Fixed tiles (MTC-RD).** Minimize $\sum_b D_{b,m_b} + \lambda R_{b,m_b}$ with bisection on $\lambda$, then fill the remaining budget greedily. The total-bit budget is met exactly.
+
+**Quadtree (MTC-QT).** Every node is either a leaf with its own (mode, scale) or splits into four children. Leaves pay payload plus 16-bit scale plus 8-bit mode; internal decisions pay 1 split-flag bit. For each $\lambda$, bottom-up pruning solves the problem **exactly**:
+
+$$
+J(\text{node}) = \min\Big(J_{\text{leaf}}(\text{node}),\; \sum_{\text{children}} J(\text{child})\Big) + \lambda \cdot 1\,\text{bit}
+$$
+
+This is the coding-tree decision used in HEVC/VVC video coding, applied to tensor storage. Smooth regions get large, cheap tiles. Regions with outlier rows or columns get small tiles with their own scales. Near-silent regions drop to P0 or P2.
+
+**Storage format.** P3/P5/P6 blocks are stored as little-endian bitstreams; P0 blocks occupy zero payload bytes. Block offsets come from a prefix sum and are not stored. `MTCMatrix.from_allocation` produces the packed arena. Tests check that the arena size equals the accounted payload bits and that the Numba GEMM reproduces the simulated quantization to about 1e-7.
 
 ---
 
-## 2. The Three Architectural Layers of MTC-8
+## 2. Status of Earlier Claims (Corrected)
 
-```mermaid
-graph TD
-    subgraph Layer 3: Execution & Negotiation
-        E3["Joint Precision Negotiator"] --> K1["Fused MTMUL Kernel"]
-        E3 --> K2["Macrotiled GEMM Engine"]
-    end
+An external review of the first version of this repository found that several headline numbers came from weak baselines. They are corrected here:
 
-    subgraph Layer 2: Structural Pointer Hierarchy
-        P1["PointerTensor Root (DAG / OP_REF)"] --> P2["Sub-Block Grid (2x2 Quadtree)"]
-        P2 --> P3["Leaf Pointer (DATA_REF)"]
-    end
+| Earlier claim | Status |
+| :--- | :--- |
+| "50× error reduction over INT4" | That comparison used **per-tensor** INT4. Against block or group INT at matched bits, the original ε-negotiation mostly bought accuracy by spending 12–16 bits. The RD allocator above replaces it and is evaluated at matched total bits. |
+| "2.5× faster than INT8 GEMM" | The INT8 baseline used a cache-hostile loop order, and the MTC kernel computes in FP32 internally. FP32 BLAS (≈230 GFLOPS) is far faster than the MTC kernel (≈35–38 GFLOPS) on this CPU. **No speed advantage is claimed.** The contribution is accuracy per stored bit, i.e. memory and bandwidth. |
+| "MTC-Adaptive inference 5.1× faster than INT8" | `LinearMTCAdaptive.forward` runs BLAS on cached dequantized weights, so it measures FP32 BLAS speed, not the packed format. |
+| "Ternary QAT converges" | The final loss of 2.754 is at chance level for 16 classes (ln 16 = 2.773). The ternary model did not learn. |
+| "5 trits/byte, zero multipliers" | The 1.6 bits/trit packing is correct but already standard (e.g. llama.cpp `TQ1_0`). "Zero multipliers" is not a speed advantage in software: the ternary path is about 27× slower than FP32. |
+| RNS "carry-free" channels, p-adic ultrametrics | Mathematically correct demonstrations. They are not connected to any measured efficiency gain and are kept as exploratory modules. |
+| 3D octree "97.9% memory reduction" | Valid for the synthetic mostly-empty volume shown. A sparse-volume format such as OpenVDB is the relevant comparison and has not been benchmarked. |
 
-    subgraph Layer 1: Elementary Storage
-        P3 --> A1["Memory Arena (Contiguous uint8)"]
-        A1 --> M1["8-bit MicroTensor: P2 (4x 2-bit values)"]
-        A1 --> M2["8-bit MicroTensor: P4 (2x 4-bit values)"]
-        A1 --> M3["8-bit MicroTensor: P8 (1x 8-bit value)"]
-        A1 --> M4["Escape Mode: P16 (16-bit integer/float)"]
-    end
-```
-
-### Layer 1: Elementary MicroTensor (8-bit Payload)
-The atomic storage unit is an **invariant 8-bit byte** whose interpretation is strictly decoupled from its storage bits:
-- **P2 (2-bit signed)**: 4 values packed per byte ($\mathbb{Z}_2 \in \{-2, -1, 0, 1\}$). 2×2 tile per byte.
-- **P4 (4-bit signed)**: 2 values packed per byte ($\mathbb{Z}_4 \in \{-8, \dots, 7\}$). 2×1 or 1×2 tile per byte.
-- **P8 (8-bit signed)**: 1 value per byte ($\mathbb{Z}_8 \in \{-128, \dots, 127\}$).
-- **P16 (Escape Mode)**: 2 bytes per value ($\mathbb{Z}_{16} \in \{-32768, \dots, 32767\}$) for extreme outliers.
-
-### Layer 2: Structural Pointer Tensors
-Rather than assigning pointers to individual scalars, matrices are organized as a hierarchical grid:
-
-$$
-P = \begin{bmatrix} r_{11} & r_{12} \\ r_{21} & r_{22} \end{bmatrix}
-$$
-
-Each entry is an offset into a contiguous memory arena or a reference to an operation node (`OP_MATMUL`, `OP_ADD`, `OP_TRANSPOSE`). This enables zero-copy transposition, quadtree composition, and lazy execution graphs.
-
-### Layer 3: Joint Precision Negotiation
-Traditional quantization selects precision independently per tensor. In MTC, interacting blocks $A_{ik}$ and $B_{kj}$ negotiate their precision jointly based on the forward product error bound:
-
-$$
-\|\Delta(A_{ik} B_{kj})\|_F \le \|\Delta A_{ik}\|_F \|B_{kj}\|_F + \|A_{ik}\|_F \|\Delta B_{kj}\|_F + \|\Delta A_{ik}\|_F \|\Delta B_{kj}\|_F
-$$
-
-Subject to reduction dimension scaling:
-
-$$
-\epsilon_{\text{block}} = \frac{\epsilon_{\text{target}}}{\sqrt{K / B_s}}
-$$
-
-The engine selects the minimum bit-budget pair $(p_A, p_B) \in \{2, 4, 8, 16\}^2$ satisfying the bound.
+The legacy benchmarks (`benchmark_runner.py`, `benchmark_inference.py`, `benchmark_training.py`, `benchmark_geometric.py`) are kept for reproducibility, but their output should be read with the caveats above.
 
 ---
 
-## 3. The Elementary Multiplication Primitive
+## 3. Architecture
 
-For two $2\times 2$ micro-tensors:
+### Layer 1: Elementary storage
+Blocks live in a contiguous `uint8` memory arena. Modes:
+- **P0**: dropped block, zero payload.
+- **P2 / P4 / P8 / P16**: byte-aligned packing.
+- **P3 / P5 / P6**: bitstreams.
+
+Each block also carries a scale (fp32 or bf16) and a mode byte.
+
+### Layer 2: Structural pointer hierarchy
+`PointerTensor` organizes blocks as a 2×2 hierarchy whose entries are arena offsets or operation nodes (`OP_MATMUL`, `OP_ADD`, `OP_TRANSPOSE`). This enables zero-copy transposition, quadtree composition and lazy DAG evaluation. A packed execution kernel for MTC-QT leaves is the natural next use of this layer.
+
+### Layer 3: Precision allocation
+- **Original**: per-block-pair "joint negotiation" against a Frobenius error bound (`mtc/core/precision.py`).
+- **Current**: rate-distortion allocation (`mtc/core/allocation.py`, `mtc/core/quadtree.py`), described in section 1.
+
+### The elementary multiplication primitive
+Blocks are multiplied as integer tiles and rescaled once per block product:
 
 $$
-A = \begin{bmatrix} a & b \\ c & d \end{bmatrix}, \qquad B = \begin{bmatrix} e & f \\ g & h \end{bmatrix}
+C_{ij} \leftarrow C_{ij} + (\text{scale}_A \cdot \text{scale}_B) \sum_k A_{ik} B_{kj}
 $$
 
-We define the native instruction:
-
-$$
-\mathrm{MTMUL}(A, B, C)
-$$
-
-Where inner products accumulate strictly in **INT32 / FP32** before applying block scales:
-
-$$
-C_{ij} \leftarrow C_{ij} + (\text{scale}_A \cdot \text{scale}_B) \sum_k (A_{ik} B_{kj})_{\mathbb{Z}}
-$$
-
-**Low-precision storage never compromises accumulation accuracy.**
+The current Numba kernel accumulates in FP32 and skips any block product involving a P0 block.
 
 ---
 
-## 4. Empirical Evaluation & Baselines
+## 4. Exploratory Modules
 
-All tests were executed on dense $N \times N$ square matrices across four distinct distributions:
-- **Gaussian**: Standard normal $\mathcal{N}(0, 1)$.
-- **Uniform**: $\mathcal{U}(-1, 1)$.
-- **Outliers**: 98% small magnitudes with 2% extreme heavy-tail outliers ($\pm 25.0$).
-- **Multi-Scale**: Blockwise energy varying across orders of magnitude ($10^{-3}$ to $10^2$).
-
-### Benchmark Results ($N = 256$)
-
-| Distribution | Architecture | Compression | Rel Error | SNR (dB) | Kernel (ms) | Kernel GFLOPS |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Multi-Scale** | Conventional INT4 | 8.0x | 0.4329 *(collapse)* | 7.3 dB | 2.05 ms | 16.38 |
-| | Conventional INT8 | 4.0x | 0.0350 | 29.1 dB | 2.29 ms | 14.63 |
-| | **MTC-8 Joint ($\epsilon=0.05$)** | **2.7x** | **0.0070** | **43.1 dB** | **0.94 ms** | **35.69** |
-| **Outliers** | Conventional INT4 | 8.0x | 0.1068 | 19.4 dB | 2.04 ms | 16.43 |
-| | Conventional INT8 | 4.0x | 0.0319 | 29.9 dB | 2.46 ms | 13.62 |
-| | **MTC-8 Joint ($\epsilon=0.05$)** | **2.0x** | **0.0001** | **78.0 dB** | **0.97 ms** | **34.57** |
-| **Uniform** | Conventional INT4 | 8.0x | 0.1017 | 19.9 dB | 2.01 ms | 16.68 |
-| | Conventional INT8 | 4.0x | 0.0056 | 45.0 dB | 2.82 ms | 11.92 |
-| | **MTC-8 Joint ($\epsilon=0.05$)** | **4.0x** | **0.0055** | **45.1 dB** | **0.95 ms** | **35.47** |
-| **Gaussian** | Conventional INT4 | 8.0x | 0.2497 | 12.1 dB | 2.04 ms | 16.42 |
-| | Conventional INT8 | 4.0x | 0.0137 | 37.2 dB | 2.28 ms | 14.71 |
-| | **MTC-8 Joint ($\epsilon=0.05$)** | **2.7x** | **0.0069** | **43.2 dB** | **1.29 ms** | **26.07** |
-
-### Key Takeaways
-1. **Compute Speedup**: MTC-8 macrotiled kernels achieved **2.0x to 2.5x compute throughput over INT8 and INT4** on CPU due to L1 cache residency of micro-tiles.
-2. **Numerical Resilience**: On multi-scale matrices, INT4 collapsed (43.3% error), while MTC-8 Joint maintained **0.70% error (+14 dB over INT8)**.
-3. **Pointer Hierarchy**: Zero performance penalty on execution (0.95 ms with pointers vs 0.94 ms without pointers).
-4. **End-to-End Amortization**: Preprocessing / negotiation on CPU takes ~45–780 ms in software, confirming that dynamic joint negotiation is ideal for **offline-weight quantization** (e.g. LLM inference) or dedicated hardware instruction units.
+- **3D micro-cubes and octrees** (`mtc/spatial3d`):
+  - 2×2×2 voxel cubes (P1 spin packing 8 voxels per byte).
+  - Octrees with vacuum pruning.
+  - 3D convolution and trilinear contractions.
+- **Number-theoretic arithmetic** (`mtc/primes`):
+  - Residue Number System over coprime moduli with CRT reconstruction.
+  - Balanced ternary $\mathbb{F}_3$ with 5 trits/byte packing and add/subtract-only GEMM.
+  - $p$-adic valuations and ultrametric tree distance.
+- **Neural network layers** (`mtc/nn`): FP32, INT8, MTC-Adaptive and ternary (BitNet-style) linear layers, plus a small MLP. See section 2 for the caveats.
 
 ---
 
-## 5. 3D Spatial Geometry: Micro-Cubes and Octrees
-
-Extending MicroTensor Computing into three dimensions introduces elementary spatial volume elements and non-Euclidean spatial sparsity:
-
-### The Elementary $2\times 2\times 2$ Micro-Cube
-- **P1 (1-bit Spin / Binary $\{-1, +1\}$)**: 8 voxel states packed into **exactly one 8-bit byte** ($8 \times 1 = 8\text{ bits}$).
-- **P2 (2-bit $\{-2, -1, 0, 1\}$)**: $8 \times 2 = 16\text{ bits}$ (2 bytes / `uint16`).
-- **P4 (4-bit $\{-8, \dots, 7\}$)**: $8 \times 4 = 32\text{ bits}$ (4 bytes / `uint32`).
-- **P8 (8-bit $\{-128, \dots, 127\}$)**: $8 \times 8 = 64\text{ bits}$ (8 bytes / `uint64`).
-
-### Octree Geometry with Vacuum Pruning
-Physical fields (electromagnetism, fluid mechanics, 3D neural radiance fields) are predominantly empty space. `OctreeTensor` decomposes 3D volumes into 8 sub-octants. Any zero-energy region is pruned into a single `VACUUM` node requiring **zero arena memory allocation** (demonstrating >98% memory savings on sparse 3D volumes).
-
-### 3D Operations
-- **MicroCube Spatial Convolution**: Fused 3D convolution with $2\times 2\times 2$ filter cubes.
-- **Trilinear Tensor Contractions**: $C_{dhw} = \sum_k A_{dhk} B_{khw}$.
-
----
-
-## 6. Number-Theoretic Tensor Computing: Primes, RNS, and Ultrametrics
-
-Primes introduce three fundamental properties to geometric computing:
-
-### A. Residue Number Systems (RNS) — Carry-Free Parallel Arithmetic
-Numbers are decomposed across a basis of coprime prime moduli $\mathcal{B} = \{p_1, p_2, \dots, p_k\}$ via the Chinese Remainder Theorem (CRT):
-
-$$
-X \iff (x \bmod p_1, \; x \bmod p_2, \; \dots, \; x \bmod p_k)
-$$
-
-- **Zero carry propagation**: Vector dot products and GEMM execute independently and in parallel across prime channels.
-- Modular channels eliminate ALU carry ripple chains entirely.
-
-### B. Balanced Ternary Computing ($\mathbb{F}_3$)
-- **Optimal Radix Economy**: Information theory proves hardware radix economy is minimized at $e \approx 2.718$; the closest integer radix is **3** ($E=2.730$ vs $2.885$ for binary).
-- **High-Density Packing**: 5 balanced trits $\{-1, 0, 1\}$ pack into a single 8-bit byte ($3^5 = 243 \le 256$), yielding **25% higher storage density** than standard 2-bit packing.
-- **Multiplier-Free GEMM**: Matrix multiplication becomes purely addition and subtraction—hardware multipliers are completely bypassed.
-
-### C. $p$-Adic Ultrametric Geometry
-Hierarchical tree structures (quadtrees, octrees) are fundamentally **non-Archimedean ultrametric spaces** satisfying the strong triangle inequality:
-
-$$
-d_p(x, z) \le \max\big(d_p(x, y), \; d_p(y, z)\big)
-$$
-
-Lowest Common Ancestor (LCA) tree traversal is mathematically isometric to $p$-adic distance, allowing hierarchical and scale-free semantic embeddings with zero topological distortion.
-
----
-
-## 7. End-to-End Neural Network Training & Inference
-
-We evaluated a 4-layer DeepMLP (~528,000 parameters: $256 \to 512 \to 512 \to 256 \to 16$) across FP32, conventional INT8, pre-packed MTC-8 Adaptive, and Balanced Ternary ($\mathbb{F}_3$ BitNet-style QAT):
-
-### A. Inference Storage & Latency
-
-| Model Architecture | Model Weight Size | Compression Ratio | Batch 16 Latency | Batch 16 Throughput | Output Error | Multipliers Used |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **FP32 Reference** | 2,069.1 KB | 1.0x baseline | 0.272 ms | 58,845 samples/s | 0.0000 | Standard FP32 |
-| **Conventional INT8** | 521.1 KB | 4.0x | 1.265 ms | 12,648 samples/s | 0.0070 | Standard INT8 |
-| **MTC-8 Adaptive (Pre-Packed)** | **521.1 KB** | **4.0x** | **0.246 ms** | **65,146 samples/s** | **0.0067** | **L1-Tiled (5.1× faster than INT8)** |
-| **Balanced Ternary ($\mathbb{F}_3$)** | **108.3 KB** | **19.1x** | 7.404 ms | 2,161 samples/s | — | **ZERO (Pure addition/subtraction)** |
-
-### B. Training Convergence via Straight-Through Estimator (STE)
-We trained the 528K-parameter model on a 16-class classification task for 15 epochs:
-- **FP32 Baseline**: Loss converged from **2.7693 $\to$ 1.5492** (weight memory: 2,069 KB).
-- **Balanced Ternary QAT**: Loss converged steadily from **2.7716 $\to$ 2.7537** using **108.3 KB weight memory (19.1× parameter reduction)** with **ZERO multiplications in layer forward or backward activation passes**!
-
----
-
-## 8. Repository Structure
+## 5. Repository Structure
 
 ```
 mtc/
 ├── core/
-│   ├── types.py            # PrecisionMode (P2, P4, P8, P16), OpCode (DATA, MATMUL, ADD, etc.)
+│   ├── types.py            # PrecisionMode (P0, P2, P3, P4, P5, P6, P8, P16), OpCode
 │   ├── arena.py            # Contiguous uint8 memory arena
 │   ├── packing.py          # Numba bit-packing & unpacking routines
 │   ├── microtensor.py      # Elementary MicroTensor & BlockDescriptor
 │   ├── pointer_tensor.py   # PointerTensor hierarchy, DAG operations, lazy evaluate
-│   └── precision.py        # Joint Precision Negotiation & error estimators
-├── nn/
-│   ├── layers.py           # LinearFP32, LinearINT8, LinearMTCAdaptive, LinearTernaryBitNet
-│   └── model.py            # DeepMLP multi-layer architectures (FP32, INT8, MTC, Ternary)
-├── spatial3d/
-│   ├── types3d.py          # PrecisionMode3D (P1..P16) and OctantIndex
-│   ├── packing3d.py        # 2x2x2 MicroCube bit-packing (P1 spin in 1 byte)
-│   ├── microcube.py        # Elementary MicroCube volume element
-│   ├── octree_tensor.py    # 3D Octree with vacuum pruning
-│   └── conv3d.py           # 3D spatial convolution & trilinear contractions
-├── primes/
-│   ├── rns.py              # Residue Number System (CRT & carry-free parallel channels)
-│   ├── ternary.py          # Balanced Ternary F3, 5-trits/byte, multiplier-free GEMM
-│   └── padic.py            # p-adic valuation, norm, and ultrametric tree distance
+│   ├── precision.py        # Original joint precision negotiation (legacy)
+│   ├── allocation.py       # MTC-RD: activation-aware rate-distortion block allocation
+│   └── quadtree.py         # MTC-QT: variable-block-size (quadtree) RD allocation
 ├── kernels/
-│   ├── reference.py        # FP32 BLAS reference & numerical validation metrics
-│   ├── mtmul.py            # Elementary 2x2 MTMUL kernel with fused INT32 accumulation
-│   └── gemm.py             # Macrotiled parallel GEMM engine over memory arena
+│   ├── reference.py        # FP32 BLAS reference & error metrics
+│   ├── mtmul.py            # Elementary 2x2 MTMUL kernel
+│   └── gemm.py             # Macrotiled GEMM over the arena (P0..P16, bitstream modes)
 ├── baselines/
-│   ├── int8_gemm.py        # Conventional INT8 quantized GEMM baseline
-│   └── int4_gemm.py        # Conventional INT4 packed GEMM baseline
+│   ├── formats.py          # Block/group INT, MXFP4, MXINT8, NVFP4, outlier-split, AWQ-style
+│   ├── int8_gemm.py        # Legacy per-tensor INT8 baseline
+│   └── int4_gemm.py        # Legacy per-tensor INT4 baseline
 ├── benchmarks/
-│   ├── benchmark_runner.py    # Multi-distribution benchmark suite
-│   ├── benchmark_geometric.py # 3D Octree and Prime RNS benchmarks
-│   ├── benchmark_inference.py # End-to-end neural network inference benchmark
-│   ├── benchmark_training.py  # Neural network QAT training benchmark
-│   └── report.py              # Markdown benchmark report generator
-└── experiments/
-    ├── precision_analysis.py # Allocation distributions across error tolerances
-    └── error_analysis.py     # Error accumulation across reduction dimension K
+│   ├── benchmark_llm.py       # Real-LLM perplexity (Qwen2.5-0.5B, WikiText-2)
+│   ├── benchmark_pareto.py    # Accuracy-per-bit Pareto curves vs fair baselines
+│   ├── benchmark_runner.py    # Legacy multi-distribution benchmark
+│   ├── benchmark_geometric.py # 3D octree and RNS benchmarks
+│   ├── benchmark_inference.py # Legacy NN inference benchmark
+│   ├── benchmark_training.py  # Legacy NN QAT benchmark
+│   └── report.py              # Markdown report generator
+├── nn/                     # Linear layers and DeepMLP
+├── spatial3d/              # Micro-cubes, octrees, 3D convolution
+├── primes/                 # RNS, balanced ternary, p-adic
+└── experiments/            # Precision and error-accumulation analyses
+results/                    # Generated benchmark tables, JSON and figures
 ```
 
 ---
 
-## 9. Getting Started
+## 6. Getting Started
 
-### Installation
 ```bash
 git clone https://github.com/Sharexi/TensorPack.git
 cd TensorPack
 pip install -r requirements.txt
-```
-
-### Run Tests (All 34 Tests: 2D, 3D, Primes, and Neural Networks)
-```bash
-python -m pytest tests/
-```
-
-### Run Full Reproduction Suite (2D, 3D, Primes, Inference & Training)
-```bash
-python reproduce.py
+python -m pytest tests/                       # 57 tests
+python -m mtc.benchmarks.benchmark_pareto     # ~1 min  -> results/pareto.*
+python -m mtc.benchmarks.benchmark_llm        # ~75 min -> results/llm_ppl.* (needs torch, transformers, datasets)
+python reproduce.py                           # tests + Pareto + legacy demos (add --llm for the LLM run)
 ```
 
 ---
 
-## 10. Research Paper & Citation
+## 7. Limitations and Next Steps
 
-This repository serves as the official reference implementation, test harness, and empirical benchmark suite for the research paper:
+- **Simulation and execution.** The perplexity results are weight-only and use round-to-nearest within each block. The packed arena format and Numba kernel execute fixed 16×16 allocations. MTC-QT stores an exact, compact allocation, but it has no packed execution kernel yet.
+- **Scale of evaluation.** One 0.5B model on one dataset. Larger models (1–8B), zero-shot tasks, and GPTQ-style error compensation (which is orthogonal and could be combined with RD allocation) are still to be done.
+- **No speed claims.** Planned work:
+  - a packed quadtree kernel;
+  - block-sparse P0 skipping at scale;
+  - a quadtree with a sparse outlier list;
+  - rectangular (multi-type-tree) splits;
+  - lattice vector quantization inside blocks.
 
-> **MicroTensor Computing (MTC-8): An Architecture for Adaptive Sub-Byte GEMM, Spatial Octrees, and Prime Residue Arithmetic**  
-> **Author:** Aniello Quaranta  
-> **Permanent DOI:** [10.5281/zenodo.23843968](https://doi.org/10.5281/zenodo.23843968)  
-> **Preprint Publication:** [https://zenodo.org/records/23843968](https://zenodo.org/records/23843968)
+---
 
-To cite this work or software repository:
+## Citation
 
 ```bibtex
-@article{quaranta2026mtc8,
-  title={MicroTensor Computing (MTC-8): An Architecture for Adaptive Sub-Byte GEMM, Spatial Octrees, and Prime Residue Arithmetic},
-  author={Quaranta, Aniello},
-  journal={Zenodo Preprint},
-  year={2026},
-  doi={10.5281/zenodo.23843968},
-  url={https://zenodo.org/records/23843968}
+@software{quaranta2026mtc,
+  title  = {MicroTensor Computing (MTC-8): Geometric Rate-Distortion Allocation for Sub-Byte Tensors},
+  author = {Quaranta, Aniello},
+  year   = {2026},
+  url    = {https://github.com/Sharexi/TensorPack}
 }
 ```
 
 ## Author & Acknowledgments
 
-- **Author**: **Aniello Quaranta** ([Sharexi](https://github.com/Sharexi)) — Conceptual formulation, mathematical architecture, geometric foundations, and research direction.
-- **AI Pair Programming Disclosure**: Developed in collaboration with Google DeepMind's Gemini / Antigravity as an interactive AI pair programmer and drafting assistant under the author's continuous architectural supervision, experimental direction, and verification.
+- **Author**: **Aniello Quaranta** ([Sharexi](https://github.com/Sharexi)). Conceptual formulation, mathematical architecture, geometric foundations and research direction.
+- **AI Pair Programming Disclosure**:
+  - The original implementation was developed with Google DeepMind's Gemini / Antigravity as an interactive AI pair programmer.
+  - The rate-distortion allocation (MTC-RD / MTC-QT), the fair-baseline suite, the LLM evaluation and the corrections in section 2 were developed with Anthropic's Claude.
+  - All AI-assisted work was done under the author's direction and verification.
 
 ## License
 MIT License. Copyright (c) 2026 Aniello Quaranta. See [LICENSE](LICENSE) for details.
