@@ -210,7 +210,7 @@ pip install -r requirements.txt
 python -m pytest tests/                       # 57 tests
 python -m mtc.benchmarks.benchmark_pareto     # ~1 min  -> results/pareto.*
 python -m mtc.benchmarks.benchmark_llm        # ~75 min -> results/llm_ppl.* (needs torch, transformers, datasets)
-python reproduce.py                           # legacy suite
+python reproduce.py                           # tests + Pareto + legacy demos (add --llm for the LLM run)
 ```
 
 ---

@@ -1,5 +1,5 @@
 """
-Balanced Ternary Computing (F_3) and Multiplier-Free Tensor Operations.
+Balanced Ternary Computing (F_3): 5-trits-per-byte packing and add/subtract-only GEMM.
 """
 
 from typing import Tuple
@@ -91,10 +91,12 @@ def ternary_multiplier_free_gemm(
     out: np.ndarray
 ):
     """
-    Multiplier-Free GEMM: Y = W @ X
+    Ternary GEMM: Y = W @ X
     W_trits has values strictly in {-1, 0, 1}.
     X has arbitrary floating-point values.
-    Computes Y using ONLY additions and subtractions (zero multipliers!).
+    No multiplications in the inner loop: only conditional additions and subtractions.
+    This models what multiplier-free ternary hardware would execute; on a CPU it is
+    slower than FP32 BLAS and is not a speed claim.
     """
     M, K = W_trits.shape
     K2, N = X.shape

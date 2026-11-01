@@ -37,7 +37,7 @@ def test_rns_parallel_dot_product_carry_free():
     A_res = rns.to_residues(A)
     B_res = rns.to_residues(B)
 
-    # Compute dot product strictly in residue channels (zero carry between channels!)
+    # Compute dot product strictly in residue channels (no carries between channels)
     dot_res = rns.parallel_dot_product(A_res, B_res)
     recon_dot = int(rns.from_residues(dot_res, signed=True))
 

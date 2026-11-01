@@ -84,8 +84,8 @@ def benchmark_primes_and_ternary():
     print("2. NUMBER-THEORETIC & BALANCED TERNARY (F_3) BENCHMARK")
     print("=" * 70)
 
-    # A. Balanced Ternary Multiplier-Free GEMM vs FP32
-    print("\n[A. Balanced Ternary F_3 Multiplier-Free GEMM]")
+    # A. Balanced Ternary add/subtract-only GEMM vs FP32 BLAS
+    print("\n[A. Balanced Ternary F_3 Add/Subtract-Only GEMM]")
     M, K, N = 256, 512, 256
     np.random.seed(42)
     W_trits = np.random.choice(np.array([-1, 0, 1], dtype=np.int8), size=(M, K))
@@ -99,7 +99,7 @@ def benchmark_primes_and_ternary():
         out_fp32 = W_float @ X
     t_fp32 = (time.perf_counter() - t0) / 5.0 * 1000.0
 
-    # Measure Multiplier-Free Ternary GEMM (only adds and subtracts!)
+    # Measure ternary GEMM (adds and subtracts only)
     ternary_multiplier_free_gemm(W_trits, X, out_ternary)
     times = []
     for _ in range(5):
@@ -113,9 +113,8 @@ def benchmark_primes_and_ternary():
     rel_diff = np.linalg.norm(out_fp32 - out_ternary) / np.linalg.norm(out_fp32)
 
     print(f"  - Matrix Dimensions:        M={M}, K={K}, N={N} ({flops/1e6:.1f} MOps)")
-    print(f"  - Multipliers Used:         ZERO (Pure addition & subtraction)")
-    print(f"  - Multiplier-Free Latency:  {t_ternary:.2f} ms ({gflops_ternary:.2f} GOps/s)")
-    print(f"  - Hardware Multiplier Time: {t_fp32:.2f} ms")
+    print(f"  - Ternary add/sub Latency:  {t_ternary:.2f} ms ({gflops_ternary:.2f} GOps/s)")
+    print(f"  - FP32 BLAS Latency:        {t_fp32:.2f} ms ({t_ternary / t_fp32:.1f}x faster than ternary on CPU)")
     print(f"  - Arithmetic Accuracy:      Relative Error = {rel_diff:.2e} (Exact Equivalence)")
 
     # B. 5-Trits-per-Byte Information Density
@@ -132,15 +131,15 @@ def benchmark_primes_and_ternary():
     print(f"  - Elements:                 {num_trits:,} balanced trits")
     print(f"  - Standard 2-bit Storage:   {bytes_2bit:,} bytes (4 trits/byte)")
     print(f"  - MTC-8 Base-3 Storage:     {bytes_5trit:,} bytes (5 trits/byte)")
-    print(f"  - Net Storage Reduction:    {density_gain:.1f}% higher density")
+    print(f"  - Net Storage Reduction:    {density_gain:.1f}% fewer bytes (same scheme as llama.cpp TQ1_0)")
 
     # C. Residue Number System (RNS) Parallel Channels
-    print("\n[C. Residue Number System (RNS) Carry-Free Arithmetic]")
+    print("\n[C. Residue Number System (RNS) Arithmetic]")
     rns = PrimeResidueSystem(primes=[3, 5, 7, 11, 13, 17, 19, 23])
     print(f"  - Prime Basis:              {list(rns.primes)}")
     print(f"  - Dynamic Range M:          {rns.M:,} ([-{rns.half_M:,}, {rns.half_M:,}])")
     print(f"  - Total Prime Channels:     {rns.num_channels} completely independent channels")
-    print(f"  - ALU Carry Propagation:    0 bits (Channels compute in closed finite fields F_p)")
+    print(f"  - Inter-channel carries:    none (each channel is mod p; CRT needed to reconstruct, sign/compare are costly)")
 
 
 if __name__ == "__main__":

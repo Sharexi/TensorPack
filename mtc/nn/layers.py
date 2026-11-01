@@ -15,11 +15,13 @@ from mtc.kernels.gemm import MTCMatrix, mtc_gemm
 @njit(parallel=True, fastmath=True)
 def ternary_linear_forward(X: np.ndarray, W_trits: np.ndarray, out: np.ndarray):
     """
-    Multiplier-Free Forward Pass: Y = X @ W
+    Ternary forward pass: Y = X @ W
     X: (Batch, In_dim)
     W_trits: (In_dim, Out_dim) with values in {-1, 0, 1}
     out: (Batch, Out_dim)
-    ZERO multiplications: only conditional additions and subtractions.
+    No multiplications in the inner loop: only conditional additions and subtractions.
+    This models what multiplier-free ternary hardware would execute; on a CPU it is
+    slower than FP32 BLAS and is not a speed claim.
     """
     Batch, In_dim = X.shape
     In_dim2, Out_dim = W_trits.shape
@@ -39,11 +41,13 @@ def ternary_linear_forward(X: np.ndarray, W_trits: np.ndarray, out: np.ndarray):
 @njit(parallel=True, fastmath=True)
 def ternary_linear_backward_x(grad_out: np.ndarray, W_trits: np.ndarray, grad_x: np.ndarray):
     """
-    Multiplier-Free Backward Pass for Activations: dX = grad_out @ W.T
+    Ternary backward pass for activations: dX = grad_out @ W.T
     grad_out: (Batch, Out_dim)
     W_trits: (In_dim, Out_dim) with values in {-1, 0, 1}
     grad_x: (Batch, In_dim)
-    ZERO multiplications: only conditional additions and subtractions.
+    No multiplications in the inner loop: only conditional additions and subtractions.
+    This models what multiplier-free ternary hardware would execute; on a CPU it is
+    slower than FP32 BLAS and is not a speed claim.
     """
     Batch, Out_dim = grad_out.shape
     In_dim, _ = W_trits.shape
@@ -149,7 +153,7 @@ class LinearMTCAdaptive:
 
 class LinearTernaryBitNet:
     """
-    Balanced Ternary (F_3) Linear Layer with Multiplier-Free Forward/Backward
+    Balanced Ternary (F_3) Linear Layer with add/subtract-only forward/backward
     and Straight-Through Estimator (STE) for Quantization-Aware Training (QAT).
     """
 
@@ -186,7 +190,7 @@ class LinearTernaryBitNet:
         return out * self.scale + self.b
 
     def backward(self, grad_out: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        # Multiplier-free activation gradient backprop
+        # Activation gradient via add/subtract-only ternary kernel
         grad_x = np.empty((grad_out.shape[0], self.W_trits.shape[0]), dtype=np.float32)
         ternary_linear_backward_x(grad_out, self.W_trits, grad_x)
         grad_x = grad_x * self.scale
