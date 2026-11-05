@@ -8,7 +8,7 @@
   "xcal_rows": 256,
   "out": "results",
   "threads": 8,
-  "methods": "fp32,baselines,rd,rd_ablation,rd_bf16,qt",
+  "methods": "qt_perm",
   "tag": ""
  },
  "eval_tokens": 24576,
@@ -166,6 +166,41 @@
    "bits": 4.5,
    "ppl": 14.906824108590973,
    "quant_seconds": 228.3
+  },
+  {
+   "name": "MTC-QT-P permuted quadtree 32-4 @ 2.5 b",
+   "family": "MTC-QT-P",
+   "bits": 2.4999,
+   "ppl": 52.5295982135461,
+   "quant_seconds": 401.8
+  },
+  {
+   "name": "MTC-QT-P permuted quadtree 32-4 @ 3.125 b",
+   "family": "MTC-QT-P",
+   "bits": 3.1249,
+   "ppl": 19.799179274953154,
+   "quant_seconds": 401.8
+  },
+  {
+   "name": "MTC-QT-P permuted quadtree 32-4 @ 4.125 b",
+   "family": "MTC-QT-P",
+   "bits": 4.1249,
+   "ppl": 15.190946542488787,
+   "quant_seconds": 401.8
+  },
+  {
+   "name": "MTC-QT-P permuted quadtree 32-4 @ 4.25 b",
+   "family": "MTC-QT-P",
+   "bits": 4.25,
+   "ppl": 14.891364252739184,
+   "quant_seconds": 401.8
+  },
+  {
+   "name": "MTC-QT-P permuted quadtree 32-4 @ 4.5 b",
+   "family": "MTC-QT-P",
+   "bits": 4.4999,
+   "ppl": 14.737798812731317,
+   "quant_seconds": 592.8
   }
  ]
 }

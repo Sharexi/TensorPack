@@ -3,7 +3,7 @@ Single-command reproduction script for TensorPack / MTC-8.
 
 Usage:
     python reproduce.py            # tests + accuracy-per-bit Pareto benchmark + legacy demos
-    python reproduce.py --llm      # additionally run the Qwen2.5-0.5B perplexity benchmark (~75 min CPU)
+    python reproduce.py --llm      # additionally run the Qwen2.5-0.5B perplexity benchmark (~90 min CPU)
 """
 
 import sys
@@ -36,7 +36,7 @@ else:
     print("\n[Step 3] Skipped real-LLM perplexity benchmark (pass --llm to run it).")
 
 print("\n[Step 4] Legacy exploratory demos (3D octrees, primes, small MLP).")
-print("         These are illustrative only; see README section 2 for their caveats.")
+print("         These are illustrative demonstrations; no results are claimed for them.")
 from mtc.benchmarks.benchmark_geometric import benchmark_3d_spatial, benchmark_primes_and_ternary
 from mtc.benchmarks.benchmark_inference import benchmark_model_inference
 from mtc.benchmarks.benchmark_training import benchmark_training_convergence
