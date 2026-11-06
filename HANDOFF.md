@@ -32,7 +32,7 @@ python -m mtc.benchmarks.benchmark_gptq                      # defaults: --metho
 
 - It writes `results/llm_gptq.json` / `.md` after every method, and a rerun skips the methods already done.
 - Optional extra methods: `qt_gptq` (unpermuted quadtree + GPTQ) and `qtp_rtn_seq` (MTC-QT-P with sequential calibration but no GPTQ). The second one separates the gain of GPTQ from the gain of sequential calibration.
-- **Comparability check:** perplexity depends slightly on the torch/transformers versions. Rerun FP32 and one RTN baseline in the same environment (`python -m mtc.benchmarks.benchmark_llm --methods fp32,baselines`, written to `results/llm_ppl.json`, so back up the committed file first). Compare GPTQ numbers only with baselines from the same environment.
+- **Comparability check:** perplexity depends slightly on the torch/transformers versions. Rerun FP32 and one RTN baseline in the same environment (`python -m mtc.benchmarks.benchmark_llm --methods fp32,baselines --out results/env_check`; use a fresh `--out`, because the script resumes from an existing `llm_ppl.json` and would skip everything). Compare GPTQ numbers only with baselines from the same environment.
 - Then update the README:
   - Add a GPTQ column or rows to the Qwen table.
   - Remove the bullet "GPTQ-style error compensation has not been compared yet".
