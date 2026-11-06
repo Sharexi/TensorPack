@@ -181,11 +181,13 @@ mtc/
 │   └── gemm.py             # Macrotiled GEMM over the arena (P0..P16, bitstream modes)
 ├── baselines/
 │   ├── formats.py          # Block/group INT, MXFP4, MXINT8, NVFP4, outlier-split, AWQ-style
+│   ├── gptq.py             # GPTQ error compensation (group-INT grid or fixed MTC-QT-P grid)
 │   ├── int8_gemm.py        # Legacy per-tensor INT8 baseline
 │   └── int4_gemm.py        # Legacy per-tensor INT4 baseline
 ├── benchmarks/
 │   ├── benchmark_llm.py       # Real-LLM perplexity (Qwen2.5-0.5B, WikiText-2)
 │   ├── benchmark_pareto.py    # Accuracy-per-bit Pareto curves vs fair baselines
+│   ├── benchmark_gptq.py      # GPTQ baselines and MTC-QT-P + GPTQ (sequential calibration)
 │   ├── benchmark_runner.py    # Legacy multi-distribution benchmark
 │   ├── benchmark_geometric.py # 3D octree and RNS benchmarks
 │   ├── benchmark_inference.py # Legacy NN inference benchmark
@@ -206,7 +208,7 @@ results/                    # Generated benchmark tables, JSON and figures
 git clone https://github.com/Sharexi/TensorPack.git
 cd TensorPack
 pip install -r requirements.txt
-python -m pytest tests/                       # 62 tests
+python -m pytest tests/                       # 67 tests
 python -m mtc.benchmarks.benchmark_pareto     # ~1 min  -> results/pareto.*
 python -m mtc.benchmarks.benchmark_llm        # ~90 min -> results/llm_ppl.* (needs torch, transformers, datasets)
 python reproduce.py                           # tests + Pareto + legacy demos (add --llm for the LLM run)
@@ -218,7 +220,8 @@ python reproduce.py                           # tests + Pareto + legacy demos (a
 
 - **Simulation and execution.** The perplexity results are weight-only and use round-to-nearest within each block. The packed arena format and Numba kernel execute fixed 16×16 allocations. MTC-QT and MTC-QT-P store an exact, compact allocation, but have no packed execution kernel yet.
 - **Permutation.** Rows and columns are sorted by a one-dimensional key. Folding the permutations into neighbouring layers, a rows-only versus rows-and-columns ablation on real models, and 2D-aware orderings are still to be done.
-- **Scale of evaluation.** One 0.5B model on one dataset. Larger models (1–8B), zero-shot tasks, and GPTQ-style error compensation (which is orthogonal and could be combined with RD allocation) are still to be done.
+- **Scale of evaluation.** One 0.5B model on one dataset. Larger models (1–8B) and zero-shot tasks are still to be done.
+- **GPTQ.** `mtc/baselines/gptq.py` implements GPTQ for the g128 baseline grid and inside a fixed MTC-QT-P grid, and `benchmark_gptq.py` runs both with sequential calibration. The full Qwen run has not completed yet, so no GPTQ results are reported.
 - **No speed claims.** Planned work:
   - a packed quadtree kernel;
   - block-sparse P0 skipping at scale;
