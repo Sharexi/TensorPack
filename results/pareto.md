@@ -14,6 +14,7 @@ Bits are total stored bits per element including scales and side data. Curves ar
 | MTC-RD, no importance (ablation) | 0.4324 | 0.3102 | 0.1354 | 0.0852 | 0.0437 |
 | MTC-RD fixed 16x16 (v1) | 0.4322 | 0.3105 | 0.1355 | 0.0852 | 0.0437 |
 | MTC-QT quadtree 32-4 (ours) | 0.4150 | 0.2828 | 0.1298 | 0.0793 | 0.0406 |
+| MTC-QT-P permuted quadtree (ours) | 0.4170 | 0.2924 | 0.1319 | 0.0814 | 0.0416 |
 
 Fixed formats: MXFP4 0.1620 @ 4.25 b, NVFP4 0.1341 @ 4.50 b, MXINT8 0.0117 @ 8.25 b, INT4 0.2819 @ 4.00 b, INT8 0.0155 @ 8.00 b
 
@@ -29,6 +30,7 @@ Fixed formats: MXFP4 0.1620 @ 4.25 b, NVFP4 0.1341 @ 4.50 b, MXINT8 0.0117 @ 8.2
 | MTC-RD, no importance (ablation) | 0.3776 | 0.2517 | 0.0906 | 0.0549 | 0.0268 |
 | MTC-RD fixed 16x16 (v1) | 0.3776 | 0.2517 | 0.0906 | 0.0549 | 0.0268 |
 | MTC-QT quadtree 32-4 (ours) | 0.3572 | 0.2147 | 0.0864 | 0.0478 | 0.0234 |
+| MTC-QT-P permuted quadtree (ours) | 0.3614 | 0.2250 | 0.0876 | 0.0499 | 0.0244 |
 
 Fixed formats: MXFP4 0.2208 @ 4.25 b, NVFP4 0.1448 @ 4.50 b, MXINT8 0.0055 @ 8.25 b, INT4 0.1014 @ 4.00 b, INT8 0.0056 @ 8.00 b
 
@@ -44,6 +46,7 @@ Fixed formats: MXFP4 0.2208 @ 4.25 b, NVFP4 0.1448 @ 4.50 b, MXINT8 0.0055 @ 8.2
 | MTC-RD, no importance (ablation) | 0.2155 | 0.1341 | 0.0565 | 0.0428 | 0.0359 |
 | MTC-RD fixed 16x16 (v1) | 0.2052 | 0.1289 | 0.0551 | 0.0422 | 0.0356 |
 | MTC-QT quadtree 32-4 (ours) | 0.0273 | 0.0225 | 0.0148 | 0.0119 | 0.0085 |
+| MTC-QT-P permuted quadtree (ours) | 0.0271 | 0.0224 | 0.0149 | 0.0119 | 0.0084 |
 
 Fixed formats: MXFP4 0.1620 @ 4.25 b, NVFP4 0.0569 @ 4.50 b, MXINT8 0.0187 @ 8.25 b, INT4 0.1074 @ 4.00 b, INT8 0.0320 @ 8.00 b
 
@@ -59,6 +62,7 @@ Fixed formats: MXFP4 0.1620 @ 4.25 b, NVFP4 0.0569 @ 4.50 b, MXINT8 0.0187 @ 8.2
 | MTC-RD, no importance (ablation) | 0.0186 | 0.0123 | 0.0050 | 0.0029 | 0.0015 |
 | MTC-RD fixed 16x16 (v1) | 0.0172 | 0.0112 | 0.0044 | 0.0026 | 0.0013 |
 | MTC-QT quadtree 32-4 (ours) | 0.0155 | 0.0099 | 0.0039 | 0.0023 | 0.0012 |
+| MTC-QT-P permuted quadtree (ours) | 0.2435 | 0.1773 | 0.0768 | 0.0471 | 0.0256 |
 
 Fixed formats: MXFP4 0.1689 @ 4.25 b, NVFP4 0.1346 @ 4.50 b, MXINT8 0.0117 @ 8.25 b, INT4 0.4542 @ 4.00 b, INT8 0.0372 @ 8.00 b
 
@@ -75,5 +79,6 @@ Fixed formats: MXFP4 0.1689 @ 4.25 b, NVFP4 0.1346 @ 4.50 b, MXINT8 0.0117 @ 8.2
 | MTC-RD, no importance (ablation) | 0.4827 | 0.3815 | 0.2101 | 0.1392 | 0.0749 |
 | MTC-RD fixed 16x16 (v1) | 0.2556 | 0.2028 | 0.1084 | 0.0708 | 0.0386 |
 | MTC-QT quadtree 32-4 (ours) | 0.2050 | 0.1558 | 0.0735 | 0.0453 | 0.0236 |
+| MTC-QT-P permuted quadtree (ours) | 0.1465 | 0.1136 | 0.0560 | 0.0353 | 0.0188 |
 
 Fixed formats: MXFP4 0.1600 @ 4.25 b, NVFP4 0.1144 @ 4.50 b, MXINT8 0.0160 @ 8.25 b, INT4 0.9154 @ 4.00 b, INT8 0.1807 @ 8.00 b

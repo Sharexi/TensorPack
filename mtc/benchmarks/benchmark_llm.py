@@ -113,7 +113,7 @@ def fixed_methods() -> Dict[str, Callable]:
 RD_BUDGETS = [2.5, 3.125, 4.125, 4.25, 4.5]
 RD_ABLATION_BUDGETS = [3.125, 4.125]
 QT_BUDGETS = [2.5, 3.125, 4.125, 4.25, 4.5]
-METHOD_GROUPS = ("fp32", "baselines", "rd", "rd_ablation", "rd_bf16", "qt")
+METHOD_GROUPS = ("fp32", "baselines", "rd", "rd_ablation", "rd_bf16", "qt", "qt_perm")
 
 
 def main():
@@ -233,29 +233,37 @@ def main():
             record(f"{label} @ {b:g} b", label, bits[b] / n_params, ppl_now(), secs)
             restore()
 
-    if "qt" in groups:
-        from mtc.core.quadtree import QuadtreeRD, qt_dequant
-        label = "MTC-QT quadtree 32-4"
+    from mtc.core.quadtree import QuadtreeRD, qt_dequant
+    from mtc.core.permutation import PermutedQuadtreeRD, permuted_qt_dequant
+    qt_runs = [
+        ("qt", "MTC-QT quadtree 32-4", "MTC-QT", False),
+        ("qt_perm", "MTC-QT-P permuted quadtree 32-4", "MTC-QT-P", True),
+    ]
+    for key, label, family, permute in qt_runs:
         budgets = [b for b in QT_BUDGETS if f"{label} @ {b:g} b" not in done]
-        if budgets:
-            t = time.perf_counter()
-            # Keep only the compact allocation (leaf masks, modes, scales); rebuild exactly at eval time.
-            qt_allocs: Dict[float, Dict[str, Tuple]] = {b: {} for b in budgets}
-            bits = {b: 0.0 for b in budgets}
-            for n in linears:
-                Wt = orig_t(n)
-                qt = QuadtreeRD(Wt, h_stats[n], (32, 16, 8, 4))
-                for b in budgets:
-                    a = qt.select(b)
-                    qt_allocs[b][n] = (a.sizes, a.leaf, a.modes, a.scales)
-                    bits[b] += a.bits_per_element * Wt.size
-                del qt
-            secs = (time.perf_counter() - t) / len(budgets)
+        if key not in groups or not budgets:
+            continue
+        t = time.perf_counter()
+        # Keep only the compact allocation (perms, leaf masks, modes, scales); rebuild exactly at eval time.
+        qt_allocs: Dict[float, Dict[str, Tuple]] = {b: {} for b in budgets}
+        bits = {b: 0.0 for b in budgets}
+        for n in linears:
+            Wt = orig_t(n)
+            qt = (PermutedQuadtreeRD if permute else QuadtreeRD)(Wt, h_stats[n], (32, 16, 8, 4))
             for b in budgets:
-                for n in linears:
-                    set_weight(n, qt_dequant(orig_t(n), *qt_allocs[b][n]))
-                record(f"{label} @ {b:g} b", "MTC-QT", bits[b] / n_params, ppl_now(), secs)
-                restore()
+                a = qt.select(b)
+                inner = a.inner if permute else a
+                stored = (inner.sizes, inner.leaf, inner.modes, inner.scales)
+                qt_allocs[b][n] = ((a.row_perm, a.col_perm) + stored) if permute else stored
+                bits[b] += a.bits_per_element * Wt.size
+            del qt
+        secs = (time.perf_counter() - t) / len(budgets)
+        for b in budgets:
+            for n in linears:
+                rebuild = permuted_qt_dequant if permute else qt_dequant
+                set_weight(n, rebuild(orig_t(n), *qt_allocs[b][n]))
+            record(f"{label} @ {b:g} b", family, bits[b] / n_params, ppl_now(), secs)
+            restore()
 
     write_markdown(results, os.path.join(args.out, f"llm_ppl{args.tag}.md"))
     print(f"Done in {(time.perf_counter() - t0) / 60:.1f} min -> {out_json}")

@@ -80,17 +80,22 @@ def fixed_mode_methods() -> List[Tuple[str, Callable]]:
     ]
 
 
-def qt_methods(sizes=(32, 16, 8, 4)) -> List[Tuple[str, Callable]]:
-    """MTC-QT: one quadtree candidate search per (matrix, importance), reused for every budget."""
+def qt_methods(sizes=(32, 16, 8, 4), permute: bool = False) -> List[Tuple[str, Callable]]:
+    """
+    MTC-QT: one quadtree candidate search per (matrix, importance), reused for every budget.
+    permute=True: MTC-QT-P, rows/columns sorted by RD weight first (index bits counted).
+    """
     import hashlib
     from mtc.core.quadtree import QuadtreeRD
-    cache: Dict[str, QuadtreeRD] = {}
+    from mtc.core.permutation import PermutedQuadtreeRD
+    solver = PermutedQuadtreeRD if permute else QuadtreeRD
+    cache: Dict[str, object] = {}
 
     def get(W, h):
         key = hashlib.blake2b(W.tobytes() + (b"" if h is None else np.asarray(h).tobytes())).hexdigest()
         if key not in cache:
             cache.clear()  # keep memory bounded: callers alternate over at most a few matrices
-            cache[key] = QuadtreeRD(W, h, sizes)
+            cache[key] = solver(W, h, sizes)
         return cache[key]
 
     def q(b):
@@ -181,6 +186,7 @@ def run_scenario(evaluate: Callable, weight_only: bool) -> Dict[str, List[Dict]]
     methods["MTC-RD, no importance (ablation)"] = rd_methods(False)
     methods["MTC-RD fixed 16x16 (v1)"] = rd_methods(True)
     methods["MTC-QT quadtree 32-4 (ours)"] = qt_methods()
+    methods["MTC-QT-P permuted quadtree (ours)"] = qt_methods(permute=True)
 
     out: Dict[str, List[Dict]] = {}
     for family, entries in methods.items():
@@ -212,7 +218,8 @@ def run_all(N: int = 512) -> Dict[str, Dict]:
 # Fixed categorical order (reference palette, light surface). Color follows the
 # method family; the ablation shares MTC-RD's hue and is distinguished by dashes.
 STYLE = {
-    "MTC-QT quadtree 32-4 (ours)":          dict(color="#2a78d6", marker="o", ls="-",  lw=2.6, z=11),
+    "MTC-QT-P permuted quadtree (ours)":    dict(color="#0b3f8a", marker="*", ls="-",  lw=2.6, z=12),
+    "MTC-QT quadtree 32-4 (ours)":          dict(color="#2a78d6", marker="o", ls="-",  lw=2.0, z=11),
     "MTC-RD fixed 16x16 (v1)":             dict(color="#2a78d6", marker="o", ls=":",  lw=1.4, z=10, mfc="white"),
     "MTC-RD, no importance (ablation)":    dict(color="#2a78d6", marker="o", ls="--", lw=1.0, z=9, mfc="white"),
     "Block 16x16 INT (RTN)":               dict(color="#eb6834", marker="s", ls="-",  lw=1.4, z=5),
